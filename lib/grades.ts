@@ -2,6 +2,7 @@ export type MarkRow={roll:string;name:string;section:string;components:(number|n
 export type Subject={id:string;name:string;term:number;credit:number;columns:string[];rows:MarkRow[];source:string;updatedAt:string|null};
 export const bands:[number,string,number][]=[[.95,'A+',10],[.85,'A',9],[.75,'A-',8],[.5334,'B+',7],[.3168,'B',6],[.1002,'B-',5],[.05,'C+',4],[.025,'C',3],[.01,'C-',2],[0,'D',1]];
 export const rollKey=(s:string)=>s.replace(/[^0-9]/g,'');
+export const normalizeRoll=(s:string)=>s.replace(/\s/g,'').toUpperCase().replace(/^(PGP|ABM)[ /]?(\d{2})[ /]?(\d+R?)$/,'$1/$2/$3');
 // Excel PERCENTRANK.EXC with the omitted significance argument (three decimals).
 export function percentRankExc(values:number[],x:number):number|null{
  const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);
@@ -62,6 +63,19 @@ export function validateSubject(s:Subject){
  if(!Array.isArray(s.rows)||s.rows.length<2||s.rows.length>2000)throw Error('A marks sheet needs between 2 and 2,000 students.');
  if(!Array.isArray(s.columns)||s.columns.length>30||s.columns.some(c=>typeof c!=='string'))throw Error('Invalid component headers.');
  const seen=new Map<string,MarkRow>();
- for(const r of s.rows){if(!r.name||!/^(?:PGP|ABM)[ /]?\d{2}[ /]?\d+R?$/i.test(r.roll)||!Number.isFinite(r.total)||r.total<0||r.total>1000||!Array.isArray(r.components)||r.components.length!==s.columns.length||r.components.some(v=>v!==null&&(!Number.isFinite(v)||v<0||v>1000)))throw Error('Some student rows are incomplete or invalid.');const key=rollKey(r.roll);if(seen.has(key)&&!(s.source==='Marks Databse.xlsx'&&JSON.stringify(seen.get(key))===JSON.stringify(r)))throw Error('Duplicate student roll number: '+r.roll);seen.set(key,r);}
+ for(const [i,r] of s.rows.entries()){
+  const label=`Student row ${i+1}`;
+  if(!r||typeof r.name!=='string'||!r.name.trim())throw Error(`${label}: student name is missing.`);
+  if(typeof r.roll!=='string'||!/^(?:PGP|ABM)\/\d{2}\/\d+R?$/i.test(normalizeRoll(r.roll)))throw Error(`${label}: unrecognized roll number. Expected PGP/41/001 or ABM/22/001; returning-student suffix R is allowed.`);
+  r.roll=normalizeRoll(r.roll);
+  const rowLabel=`${label} (${r.roll})`;
+  if(!Number.isFinite(r.total)||r.total<0||r.total>1000)throw Error(`${rowLabel}: total marks must be a number between 0 and 1,000.`);
+  if(!Array.isArray(r.components)||r.components.length!==s.columns.length)throw Error(`${rowLabel}: expected ${s.columns.length} mark components; found ${Array.isArray(r.components)?r.components.length:0}. Upload the PDF again to align its columns.`);
+  const bad=r.components.findIndex(v=>v!==null&&(!Number.isFinite(v)||v<0||v>1000));
+  if(bad>=0)throw Error(`${rowLabel}: component ${bad+1} must be a number between 0 and 1,000 or blank.`);
+  const key=rollKey(r.roll);
+  if(seen.has(key)&&!(s.source==='Marks Databse.xlsx'&&JSON.stringify(seen.get(key))===JSON.stringify(r)))throw Error('Duplicate student roll number: '+r.roll);
+  seen.set(key,r);
+ }
  return s;
 }

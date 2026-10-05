@@ -1,4 +1,4 @@
-import type {MarkRow} from './grades';
+import {normalizeRoll,type MarkRow} from './grades.ts';
 export type TextLine={text:string;page:number;spans?:{start:number;end:number;x:number;width:number}[]};
 export function parseLines(lines:TextLine[]){
  const rows:MarkRow[]=[],issues:string[]=[],warnings:string[]=[];const seen=new Set<string>();let counts:number[]=[];
@@ -11,7 +11,7 @@ export function parseLines(lines:TextLine[]){
   const tail=m[3].match(/\s+((?:(?:\d+(?:\.\d+)?|AB|ABS|NA|--|-)\s*)+)$/i);
   if(!tail||!numbers){issues.push(`Page ${page}: incomplete marks for ${m[2]}.`);continue;}
   const vals=tail[1].trim().split(/\s+/).map(x=>/^\d/.test(x)?Number(x):null),total=vals.at(-1);
-  const name=m[3].slice(0,m[3].length-tail[0].length).trim(),roll=m[2].replace(/\s/g,'').toUpperCase().replace(/^(PGP|ABM)(\d{2})(\d{3,}R?)$/,'$1/$2/$3');
+  const name=m[3].slice(0,m[3].length-tail[0].length).trim(),roll=normalizeRoll(m[2]);
   if(total===null||total===undefined||!name){issues.push(`Page ${page}: total marks missing for ${roll}.`);continue;}
   if(seen.has(roll)){issues.push(`Duplicate roll number ${roll}.`);continue;}seen.add(roll);
   const comps=vals.slice(0,-1);counts.push(comps.length);

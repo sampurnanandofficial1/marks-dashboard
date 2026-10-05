@@ -24,4 +24,7 @@ const explicit=parseLines([complete,line('004',[['12',200],['AB',250],['35',300]
 assert.equal(explicit.count,3);assert.deepEqual(explicit.rows[1].components,[12,null,35]);assert.deepEqual(explicit.warnings,[]);
 assert(parseLines([complete,complete]).issues.some(i=>i.includes('Duplicate')));
 assert(parseLines([{text:'PGP/41/005 TEST STUDENT AB',page:1}]).issues.length>0);
+const formats=parseLines(['PGP41/001','PGP/40002R','ABM 22 / 003'].map(roll=>({text:roll+' TEST STUDENT 10 20 30',page:1})));
+assert.deepEqual(formats.rows.map(r=>r.roll),['PGP/41/001','PGP/40/002R','ABM/22/003']);
+validateSubject({name:'Mixed',term:4,credit:1,columns:['A','B'],rows:formats.rows,source:'test.pdf'});
 console.log('Passed: blank-cell column alignment, printed totals, safe totals-only fallback, explicit absences, duplicate and missing-total rejection.');

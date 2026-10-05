@@ -4,7 +4,7 @@ import {GraduationCap,Plus,Upload,Download,BookOpen,FileText,CheckCircle2,Search
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {Tabs,TabsList,TabsTrigger,TabsContent} from '@/components/ui/tabs';
 import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/components/ui/select';
-import {Combobox,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty} from '@/components/ui/combobox';
+import {Combobox,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty,ComboboxTrigger} from '@/components/ui/combobox';
 import {Table,TableHeader,TableBody,TableHead,TableRow,TableCell} from '@/components/ui/table';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -14,6 +14,23 @@ function remoteAPI(){return typeof window!=="undefined"?(window as any).ACADEMIC
 function marksFetch(path:string,options:RequestInit={}){const token=typeof window!=="undefined"?sessionStorage.getItem("academic_access"):null;return fetch(remoteAPI()+path,{...options,headers:{...options.headers,...(remoteAPI()&&token?{Authorization:"Bearer "+token}:{})}});}
 const fmt=(n:number|null|undefined,d=2)=>n==null?'—':n.toFixed(d);
 function Choice({value,onChange,items,label}:{value:string;onChange:(v:string)=>void;items:{value:string;label:string}[];label:string}){return <Select value={value} onValueChange={onChange}><SelectTrigger aria-label={label}><SelectValue/></SelectTrigger><SelectContent>{items.map(i=><SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent></Select>}
+
+function StudentPicker({items,value,onChange}:{items:string[];value:string;onChange:(value:string)=>void}){
+ const [query,setQuery]=useState('');
+ return <Combobox items={items} value={value||null} inputValue={query} onInputValueChange={setQuery} onOpenChange={open=>{if(open)setQuery('');}} onValueChange={v=>{if(v)onChange(v);}} autoHighlight filter={(item:string,search:string)=>search.trim().toLowerCase().split(/\s+/).every(word=>item.toLowerCase().includes(word))}>
+  <ComboboxTrigger aria-label="Select student" render={<Button variant="outline"/>} style={{width:'100%',minHeight:44,justifyContent:'space-between',textAlign:'left'}}>
+   <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{value||'Select a student'}</span>
+  </ComboboxTrigger>
+  <ComboboxContent>
+   <ComboboxInput placeholder="Search by name or roll number…" aria-label="Search students" showTrigger={false} showClear>
+    <Search size={16} aria-hidden="true" style={{marginRight:10,color:'#bdcce0'}}/>
+   </ComboboxInput>
+   <ComboboxEmpty>No students match your search.</ComboboxEmpty>
+   <ComboboxList>{(item:string)=><ComboboxItem key={item} value={item}>{item}</ComboboxItem>}</ComboboxList>
+  </ComboboxContent>
+ </Combobox>;
+}
+
 function csv(name:string,head:string[],rows:unknown[][]){const cell=(x:unknown)=>{let s=x==null?'':String(x);if(/^[=+@\-]/.test(s)&&typeof x!=='number')s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+[head,...rows].map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download=name+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 type Actual={term:number;subject:string;credit:number;grade:string;point:number};
 export default function Dashboard(){
@@ -43,7 +60,7 @@ export default function Dashboard(){
  return <div className="app"><header className="topbar"><a className="brand" href="./"><span className="brandicon"><GraduationCap size={25}/></span><span>ACADEMIC DESK<small>IIM Lucknow</small></span></a><div className="header-right"><span>Personal workspace</span><span className="avatar">SA</span></div></header><main>
  <div className="page-title"><div><div className="eyebrow">YOUR ACADEMIC PICTURE</div><h1>Report Card Generator<span>.</span></h1><p>Every subject. Every term. One clear view.</p></div><Button className="primary" onClick={()=>start(null)}><Plus size={18}/>Add subject</Button></div>
  {error&&<div role="alert" className="alert"><AlertCircle size={18}/>{error}<Button variant="outline" onClick={load}>Retry</Button></div>}{notice&&<div role="status" className="success"><CheckCircle2 size={18}/>{notice}<button onClick={()=>setNotice('')} aria-label="Dismiss notification">×</button></div>}
- <div className="controls"><div className="student-picker"><label>Student</label><Combobox items={roster} value={student||null} onValueChange={v=>{if(v)setStudent(v);}}><ComboboxInput placeholder="Search name or roll number" aria-label="Select student"/><ComboboxContent><ComboboxEmpty>No students found.</ComboboxEmpty><ComboboxList>{(item:string)=><ComboboxItem key={item} value={item}>{item}</ComboboxItem>}</ComboboxList></ComboboxContent></Combobox></div><div><label>Term</label><Choice value={term} onChange={setTerm} label="Filter term" items={[{value:'all',label:'All terms'},...terms.map(t=>({value:String(t),label:'Term '+t}))]}/></div><div className="report-actions"><Button variant="outline" onClick={()=>window.print()}><Printer size={16}/>Print report</Button></div></div>
+ <div className="controls"><div className="student-picker"><label>Student</label><StudentPicker items={roster} value={student} onChange={setStudent}/></div><div><label>Term</label><Choice value={term} onChange={setTerm} label="Filter term" items={[{value:'all',label:'All terms'},...terms.map(t=>({value:String(t),label:'Term '+t}))]}/></div><div className="report-actions"><Button variant="outline" onClick={()=>window.print()}><Printer size={16}/>Print report</Button></div></div>
  <Tabs value={tab} onValueChange={setTab}><TabsList className="view-tabs"><TabsTrigger value="report"><GraduationCap size={17}/>Report card</TabsTrigger><TabsTrigger value="subjects"><BookOpen size={17}/>Subject sheets <span>{subjects.length}</span></TabsTrigger></TabsList>
  <TabsContent value="report">{loading?<div className="loading"><LoaderCircle className="spin"/>Loading your marks…</div>:<>
  <div className="overview"><section className="hero-card"><div className="hero-top"><div><span className="eyebrow">{recorded?'RECORDED GRADES':'PERCENTILE-BASED ESTIMATE'}</span><h2>{student.split(' · ')[0]||'Select a student'}</h2><p>{student.split(' · ')[1]} <span> / </span>{term==='all'?'All available terms':'Term '+term}</p></div><GraduationCap size={42} strokeWidth={1}/></div><div className="hero-bottom"><div><span className="gpa">{fmt(gpa)}</span><span className="out-of"> / 10</span><div className="gpa-label">{term==='all'?'Cumulative GPA':'Term GPA'} over available graded credits</div></div><div className="gpa-ring" style={{background:'conic-gradient(#b2f268 '+((gpa??0)*36)+'deg,#39525a 0deg)'}}><span>{fmt(gpa)}<small>GPA / 10</small></span></div></div>{mine&&<div className="basis"><button onClick={()=>setBasis('estimated')} className={!recorded?'selected':''}>Estimated grades</button><button onClick={()=>setBasis('recorded')} className={recorded?'selected':''}>Recorded grades · Terms 1–3</button></div>}</section>

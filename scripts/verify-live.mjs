@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const base=process.argv[2],sample=process.argv[3];
+const headers={Authorization:'Bearer '+process.env.MARKS_ACCESS_CODE,Origin:'https://sampurnanandofficial1.github.io'};
+const first=await fetch(base+'/api/subjects',{headers});assert.equal(first.status,200);assert.equal(first.headers.get('access-control-allow-origin'),headers.Origin);
+const data=await first.json();assert.equal(data.subjects.length,26);
+const scas=data.subjects.find(s=>s.id==='SCAS');assert.equal(scas.rows.length,117);
+const form=new FormData();form.set('subject',JSON.stringify(scas));form.set('pdf',new File([await fs.readFile(sample)],'SCAS Sec(A_B)_Final Marks.pdf',{type:'application/pdf'}));
+const saved=await fetch(base+'/api/subjects',{headers,method:'POST',body:form});assert.equal(saved.status,200,await saved.clone().text());const result=await saved.json();assert(result.subject.updatedAt);assert.equal(result.subject.credit,scas.credit);
+const second=await (await fetch(base+'/api/subjects',{headers})).json();assert.equal(second.subjects.find(s=>s.id==='SCAS').rows.length,117);assert.equal(second.subjects.find(s=>s.id==='SCAS').updatedAt,result.subject.updatedAt);
+const html=await (await fetch('https://sampurnanandofficial1.github.io/marks-dashboard/')).text();assert(html.includes('Report Card Generator'));assert(html.includes('/marks-dashboard/assets/'));
+assert.equal((await fetch('https://sampurnanandofficial1.github.io/marks-dashboard/pdf.worker.min.mjs')).status,200);
+console.log('Live checks passed: 26 subjects, 117 SCAS rows, CORS, PDF save and persistent readback, GitHub Pages HTML and PDF worker.');

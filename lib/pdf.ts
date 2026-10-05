@@ -22,7 +22,7 @@ export function parseLines(lines:TextLine[]){
  return {rows,issues,count};
 }
 export async function extractPdf(file:File){
- const pdfjs=await import('pdfjs-dist');pdfjs.GlobalWorkerOptions.workerSrc='/pdf.worker.min.mjs';
+ const pdfjs=await import('pdfjs-dist');pdfjs.GlobalWorkerOptions.workerSrc=new URL('pdf.worker.min.mjs',document.baseURI).href;
  const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),useSystemFonts:true});
  const doc=await task.promise;
  const lines:TextLine[]=[];

@@ -1,38 +1,27 @@
-# Academic Desk — Report Card Generator
+# Report Card Generator
 
-A marks dashboard for Sampurn Anand with 26 subjects imported from visible and hidden sheets of Marks Databse.xlsx.
+A responsive marks dashboard with subject sheets, student report cards, credit-weighted GPA, CSV export and printable reports.
 
-## Workflow
+## Live hosting
 
-1. In **Report card**, choose **Add subject** or **Edit / upload PDF**.
-2. Enter the subject name, credits and term.
-3. Upload a text-based marks PDF and review the extracted students and component headings.
-4. Save. The subject table, percentile grades and credit-weighted GPA update immediately.
+The frontend deploys to GitHub Pages from this repository using the included Actions workflow. The PDF marks API deploys from the same repository to Railway and stores records and PDFs in a persistent volume at /data.
 
-Subject rows can be exported as CSV and opened in Excel. Report cards can be printed to PDF.
+API: https://marks-api-production-6abe.up.railway.app
 
-PDFs are read in the browser using a locally served PDF.js worker. Extracted subject data is saved in D1; uploaded PDFs are saved in R2. Data persists across browsers. Hosting is owner-private. Keep the repository private because the seed data includes student marks.
+## Use
+
+Select a student and term to view the report. In Report Card Generator, add or edit a subject, enter its name and credits, upload a text-based marks PDF, review the extracted columns and rows, and save. The subject sheet and report update immediately. Scanned image PDFs need OCR first.
+
+The original workbook's 26 subject sheets, including hidden sheets, are loaded. Recorded Term 1–3 grades can be viewed separately from grades estimated using the supplied percentile thresholds.
 
 ## Grading
 
-Rank implements RANK.EQ(total, totals, 0) + COUNTIF(current-row-to-end, total) - 1. Ties depend on the original source order. Z-score uses population standard deviation. Percentile implements PERCENTRANK.EXC on unrounded Z-scores with Excel's default three-decimal truncation. Each subject uses its own cohort.
-
-Grade boundaries: A+ 95%, A 85%, A− 75%, B+ 53.34%, B 31.68%, B− 10.02%, C+ 5%, C 2.5%, C− 1%, D below 1%. Points run from 10 to 1.
-
-Calculated grades are estimates. Sampurn's separately recorded Term 1–3 grades from the original workbook remain available. GPA excludes missing subjects and zero-credit subjects. Missing results never become zero marks.
-
-## PDF support
-
-Supports text-based IIM Lucknow result sheets containing PGP/41 roll numbers, student names, numeric component marks and a final total. Tested with all 117 rows in the supplied SCAS PDF. Scanned PDFs require OCR first. Unsupported or inconsistent rows block saving and show an error. Generic component headers can be edited before saving.
+Rank reproduces RANK.EQ plus the descending COUNTIF tie adjustment. Z-score uses population standard deviation. Percentile uses Excel's exclusive rank convention with its default three-decimal precision. Grade boundaries are 0.95, 0.85, 0.75, 0.5334, 0.3168, 0.1002, 0.05, 0.025, and 0.01, mapping A+ through D to points 10 through 1. Missing subjects are excluded from available-credit GPA. A constant-score cohort has undefined Z-score and percentile.
 
 ## Development
 
-Use Node 24 and the existing pnpm lockfile. Run pnpm install, pnpm dev and pnpm build. Logical database and file bindings are defined in .openai/hosting.json. Drizzle migrations live in drizzle/. Production hosting applies migrations before publishing.
+Node 24 and pnpm 11.25.0. Run pnpm install, then pnpm run build:web for the frontend. The PDF worker is generated from the installed pdfjs-dist package. Set VITE_API_URL for frontend builds.
 
-Validation:
+For the API, set ACCESS_CODE, DATA_DIR and PORT, then run node --experimental-strip-types backend/server.mjs. The Dockerfile contains this API runtime. The access code is stored as a deployment variable, never in source.
 
-- pnpm exec tsc --noEmit
-- node --experimental-strip-types scripts/verify.mjs /path/to/SCAS.pdf
-- node scripts/verify-api.mjs LOCAL_PREVIEW_URL /path/to/SCAS.pdf
-
-The API test changes credits only in the selected local development database and restores them afterward.
+Validation included matching all 117 rows in the sample SCAS PDF to the workbook and checking ties, grade thresholds, duplicate IDs, credits, CORS, uploads and persistence across restarts.

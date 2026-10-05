@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const base=process.argv[2],sample=process.argv[3];if(!base||!sample)throw Error('Pass the local preview URL and SCAS PDF path.');
+const first=await fetch(base+'/api/subjects');assert.equal(first.status,200);const data=await first.json();assert.equal(data.subjects.length,26);
+const scas=data.subjects.find(s=>s.id==='SCAS');scas.credit=1.5;
+const form=new FormData();form.set('subject',JSON.stringify(scas));form.set('pdf',new File([await fs.readFile(sample)],'SCAS test.pdf',{type:'application/pdf'}));
+const saved=await fetch(base+'/api/subjects',{method:'POST',body:form});assert.equal(saved.status,200,await saved.clone().text());const result=await saved.json();assert.equal(result.subject.credit,1.5);assert(result.subject.updatedAt);
+const second=await (await fetch(base+'/api/subjects')).json();assert.equal(second.subjects.find(s=>s.id==='SCAS').credit,1.5);assert.equal(second.subjects.find(s=>s.id==='SCAS').rows.length,117);
+const bad=new FormData();bad.set('subject',JSON.stringify({...scas,credit:-1}));assert.equal((await fetch(base+'/api/subjects',{method:'POST',body:bad})).status,400);
+const restored=new FormData();restored.set('subject',JSON.stringify({...scas,credit:1}));assert.equal((await fetch(base+'/api/subjects',{method:'POST',body:restored})).status,200);
+const html=await (await fetch(base)).text();assert(html.includes('Report Card Generator'));assert(html.includes('Add subject'));
+console.log('API passed: 26 seeded subjects, PDF save, durable readback, credit update, invalid input rejected, HTML render.');

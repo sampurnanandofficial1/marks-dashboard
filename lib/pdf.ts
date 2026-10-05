@@ -3,14 +3,14 @@ export type TextLine={text:string;page:number};
 export function parseLines(lines:TextLine[]){
  const rows:MarkRow[]=[],issues:string[]=[];const seen=new Set<string>();let counts:number[]=[];
  for(const {text,page} of lines){
-  if(!/PGP\s*[/ ]\s*41\s*[/ ]\s*\d+/i.test(text))continue;
-  const m=text.match(/^(.*?)\b(PGP\s*[/ ]\s*41\s*[/ ]\s*\d+)\s+(.+)$/i);
+  if(!/(?:PGP|ABM)\s*[\/ ]?\s*\d{2}\s*[\/ ]?\s*\d{3,}R?/i.test(text))continue;
+  const m=text.match(/^(.*?)\b((?:PGP|ABM)\s*[\/ ]?\s*\d{2}\s*[\/ ]?\s*\d{3,}R?)\s+(.+)$/i);
   if(!m){issues.push(`Page ${page}: could not read a student row.`);continue;}
   const numbers=m[3].match(/(?:\s+|^)(?:\d+(?:\.\d+)?|AB|ABS|NA|--|-)(?=\s|$)/g);
   const tail=m[3].match(/\s+((?:(?:\d+(?:\.\d+)?|AB|ABS|NA|--|-)\s*)+)$/i);
   if(!tail||!numbers){issues.push(`Page ${page}: incomplete marks for ${m[2]}.`);continue;}
   const vals=tail[1].trim().split(/\s+/).map(x=>/^\d/.test(x)?Number(x):null),total=vals.at(-1);
-  const name=m[3].slice(0,m[3].length-tail[0].length).trim(),roll=m[2].replace(/\s/g,'').replace(/^PGP/i,'PGP').replace(/PGP41/,'PGP/41/');
+  const name=m[3].slice(0,m[3].length-tail[0].length).trim(),roll=m[2].replace(/\s/g,'').toUpperCase().replace(/^(PGP|ABM)(\d{2})(\d{3,}R?)$/,'$1/$2/$3');
   if(total===null||total===undefined||!name){issues.push(`Page ${page}: total marks missing for ${roll}.`);continue;}
   if(seen.has(roll)){issues.push(`Duplicate roll number ${roll}.`);continue;}seen.add(roll);
   const comps=vals.slice(0,-1);counts.push(comps.length);
@@ -18,7 +18,7 @@ export function parseLines(lines:TextLine[]){
  }
  const count=counts.length?Math.max(...counts):0;
  if(counts.some(n=>n!==count))issues.push('Some rows have a different number of mark components. Check the PDF layout.');
- if(!rows.length)issues.push('No student rows were found. Upload a text-based result sheet with PGP/41 roll numbers. Scanned PDFs need OCR before upload.');
+ if(!rows.length)issues.push('No student rows were found. Upload a text-based result sheet with PGP or ABM roll numbers. Scanned PDFs need OCR before upload.');
  return {rows,issues,count};
 }
 export async function extractPdf(file:File){

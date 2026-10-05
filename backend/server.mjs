@@ -23,7 +23,7 @@ createServer(async(req,res)=>{
  if(!timingSafeEqual(createHash('sha256').update(token).digest(),expected))return send(401,{error:'Enter the correct access code to open your marks.'});
  if(req.url!=='/api/subjects')return send(404,{error:'Not found.'});
  try{
-  if(req.method==='GET'){const merged=new Map(seed.subjects.map(s=>[s.id,s]));for(const r of db.prepare('SELECT id,data FROM subjects').all())merged.set(r.id,JSON.parse(r.data));return send(200,{subjects:[...merged.values()],actual:seed.actual});}
+  if(req.method==='GET'){const merged=new Map(seed.subjects.map(s=>[s.id,s]));for(const r of db.prepare('SELECT id,data,pdf_key FROM subjects').all()){const saved=JSON.parse(r.data),original=merged.get(r.id);if(original&&!r.pdf_key&&saved.source===original.source){saved.rows=original.rows;saved.columns=original.columns;}merged.set(r.id,saved);}return send(200,{subjects:[...merged.values()],actual:seed.actual});}
   if(req.method!=='POST')return send(405,{error:'Method not allowed.'});
   const parts=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>25*1024*1024)return send(413,{error:'Choose a PDF smaller than 20 MB.'});parts.push(chunk);}
   const request=new Request('http://internal/api/subjects',{method:'POST',headers:req.headers,body:Buffer.concat(parts)});

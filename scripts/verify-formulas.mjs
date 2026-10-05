@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {calculate,percentRankExc,gradeFromPercentile,gradePoint,lookupResult,weightedGpa,applyReportCredits,validateSubject} from '../lib/grades.ts';
+import {parseLines} from '../lib/pdf.ts';
+const row=(total,i)=>({total,roll:'PGP/41/'+i,name:'Student '+i,section:'A',components:[]});
+const tied=calculate([1,2,2,3].map(row));
+assert.deepEqual(tied.map(r=>r.rank),[4,3,2,1]);
+assert.deepEqual(tied.map(r=>r.percentile),[.2,.4,.4,.8]);
+assert(Math.abs(tied[0].z+Math.SQRT2)<1e-12);
+assert.equal(percentRankExc([1,2,3,6,6,6,7,8,9],7),.7);
+assert.equal(percentRankExc([1,2,3,6,6,6,7,8,9],5.43),.381);
+assert.equal(percentRankExc([1,2,3,6,6,6,7,8,9],6),.4);
+assert.equal(percentRankExc([1,2],1),.333);
+for(const [threshold,grade,point] of [[.95,'A+',10],[.85,'A',9],[.75,'A-',8],[.5334,'B+',7],[.3168,'B',6],[.1002,'B-',5],[.05,'C+',4],[.025,'C',3],[.01,'C-',2],[0,'D',1]]){
+ assert.equal(gradeFromPercentile(threshold),grade);assert.equal(gradePoint(grade),point);
+ if(threshold>0)assert.notEqual(gradeFromPercentile(threshold-1e-8),grade);
+}
+assert.equal(gradePoint('UNKNOWN'),0);
+assert(calculate([2,2].map(row)).every(r=>r.error==='#DIV/0!'&&r.z===null&&r.percentile===null));
+assert.equal(lookupResult([{name:'Sampurn Anand',point:5},{name:'SAMPURN ANAND',point:9}],'SAMPURN ANAND').point,5);
+assert.equal(lookupResult([{name:'Sampurn Anand',point:5}],'Sampurn  Anand'),undefined);
+assert.equal(weightedGpa([{credit:1,point:7},{credit:.5,point:4}]),6);
+assert.equal(weightedGpa([{credit:1,point:7},{credit:1,point:null}]),null);
+assert.equal(weightedGpa([{credit:1,point:7},{credit:0,point:null}]),7);
+assert(Math.abs(weightedGpa([{credit:6,point:6},{credit:4,point:5}])-5.6)<1e-12);
+const seed=JSON.parse(fs.readFileSync(new URL('../lib/seed.json',import.meta.url)));
+for(const s of seed.subjects)validateSubject(s);
+const report=applyReportCredits(seed.subjects);
+assert.equal(report.find(s=>s.name==='ECT').credit,1);
+assert.equal(report.find(s=>s.name==='ESGMR').credit,0);
+assert.equal(report.find(s=>s.name==='SM-2').credit,0);
+assert.equal(report.filter(s=>s.term===4).reduce((n,s)=>n+s.credit,0),5);
+const parsed=parseLines([{page:1,text:'1 ABM/22/010 TEST NAME 20 30 50'},{page:1,text:'2 PGP/40/138R RETURNING STUDENT 15 20 35'},{page:1,text:'3 PGP41221 SAMPURN ANAND 10 20 30'}]);
+assert.equal(parsed.rows.length,3);assert.deepEqual(parsed.issues,[]);
+assert.equal(parsed.rows[1].roll,'PGP/40/138R');assert.equal(parsed.rows[2].roll,'PGP/41/221');
+console.log('Formula checks passed: Excel ranks, population Z-scores, exclusive percentiles, all grade boundaries, SWITCH fallback, exact-name first-match lookup, SGPA/CGPA credits, missing grades, PGP/ABM PDF extraction.');

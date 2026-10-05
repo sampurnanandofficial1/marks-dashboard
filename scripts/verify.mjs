@@ -28,7 +28,7 @@ assert.deepEqual(calculate(rows).map(r=>r.percentile),[.2,.4,.4,.8]);
 assert.equal(calculate(rows).reduce((s,r)=>s+r.z,0),0);
 assert(calculate(rows.map(r=>({...r,total:2}))).every(r=>r.z===null&&r.grade===null));
 for(const [threshold,grade,point] of bands){assert.equal(bands.find(b=>threshold>=b[0])[1],grade);assert.equal(bands.find(b=>threshold>=b[0])[2],point);}
-assert.throws(()=>validateSubject({...scas,rows:[scas.rows[0],scas.rows[0]]}),/Duplicate/);
+assert.throws(()=>validateSubject({...scas,source:'uploaded.pdf',rows:[scas.rows[0],scas.rows[0]]}),/Duplicate/);
 assert.throws(()=>validateSubject({...scas,credit:-1}),/Credit/);
 const mine=seed.subjects.map(s=>({...s,result:calculate(s.rows).find(r=>rollKey(r.roll)==='41221')}));
 const credits=mine.filter(s=>s.result?.point!=null).reduce((a,s)=>a+s.credit,0);

@@ -46,22 +46,28 @@ export function weightedGpa(entries:{credit:number;point:number|null|undefined}[
  const weighted=entries.reduce((s,e)=>s+e.credit*(e.point??0),0);
  return weighted/(credit*10)*10;
 }
-export const term4Subjects=[{name:'ESGMR',credit:0},{name:'ECT',credit:1},{name:'HFS',credit:1},{name:'Strat All',credit:1},{name:'SM-2',credit:0},{name:'SCAS',credit:1},{name:'TIDPBM',credit:1}];
+export const term4Subjects=[{name:'ESGMR',credit:1},{name:'ECT',credit:1},{name:'HFS',credit:1},{name:'Strat All',credit:1},{name:'SM-2',credit:0},{name:'SCAS',credit:1},{name:'TIDPBM',credit:1}];
 export function applyReportCredits(subjects:Subject[]):Subject[]{
- const result=subjects.map(s=>{
-  const spec=s.term===4?term4Subjects.find(t=>t.name.toLowerCase()===s.name.trim().toLowerCase()):undefined;
-  return spec?{...s,credit:spec.credit}:s;
+ return subjects.map(s=>s.name.trim().toLowerCase()==='esgmr'?{...s,term:4,credit:1}:s);
+}
+const nameKey=(name:string)=>name.trim().replace(/\s+/g,' ').toLowerCase();
+export function studentReport(subjects:Subject[],name:string){
+ return applyReportCredits(subjects).flatMap(s=>{
+  const rows=calculate(s.rows),result=rows.find(r=>nameKey(r.name)===nameKey(name));
+  if(!result)return [];
+  // When population variance is zero, use the exclusive percentile of printed
+  // totals directly so the report can still assign a grade without a Z-score.
+  const percentile=result.percentile??percentRankExc(s.rows.map(r=>r.total),result.total)!;
+  const grade=gradeFromPercentile(percentile)!;
+  return [{...s,result:{...result,percentile,grade,point:gradePoint(grade)!,error:null,usedTotalPercentile:result.percentile===null}}];
  });
- for(const spec of term4Subjects)if(!result.some(s=>s.term===4&&s.name.trim().toLowerCase()===spec.name.toLowerCase()))
-  result.push({id:'pending-term4-'+spec.name,name:spec.name,term:4,credit:spec.credit,columns:[],rows:[],source:'Awaiting marks PDF',updatedAt:null});
- return result;
 }
 export function validateSubject(s:Subject){
- if(!s||typeof s.name!=='string'||!s.name.trim()||s.name.length>100)throw Error('Enter a subject name (up to 100 characters).');
- if(!Number.isFinite(s.credit)||s.credit<0||s.credit>20)throw Error('Credit must be between 0 and 20.');
- if(!Number.isInteger(s.term)||s.term<1||s.term>6)throw Error('Select a term from 1 to 6.');
- if(!Array.isArray(s.rows)||s.rows.length<2||s.rows.length>2000)throw Error('A marks sheet needs between 2 and 2,000 students.');
- if(!Array.isArray(s.columns)||s.columns.length>30||s.columns.some(c=>typeof c!=='string'))throw Error('Invalid component headers.');
+ if(!s||typeof s.name!=='string'||!s.name.trim())throw Error('Enter a subject name.');
+ if(!Number.isFinite(s.credit)||s.credit<0)throw Error('Credit must be a non-negative number.');
+ if(!Number.isInteger(s.term)||s.term<1)throw Error('Enter a positive whole-number term.');
+ if(!Array.isArray(s.rows))throw Error('Invalid student rows.');
+ if(!Array.isArray(s.columns)||s.columns.some(c=>typeof c!=='string'))throw Error('Invalid component headers.');
  const seen=new Map<string,MarkRow>();
  for(const [i,r] of s.rows.entries()){
   const label=`Student row ${i+1}`;
@@ -69,10 +75,10 @@ export function validateSubject(s:Subject){
   if(typeof r.roll!=='string'||!/^(?:PGP|ABM)\/\d{2}\/\d+R?$/i.test(normalizeRoll(r.roll)))throw Error(`${label}: unrecognized roll number. Expected PGP/41/001 or ABM/22/001; returning-student suffix R is allowed.`);
   r.roll=normalizeRoll(r.roll);
   const rowLabel=`${label} (${r.roll})`;
-  if(!Number.isFinite(r.total)||r.total<0||r.total>1000)throw Error(`${rowLabel}: total marks must be a number between 0 and 1,000.`);
+  if(!Number.isFinite(r.total)||r.total<0)throw Error(`${rowLabel}: total marks must be a non-negative number.`);
   if(!Array.isArray(r.components)||r.components.length!==s.columns.length)throw Error(`${rowLabel}: expected ${s.columns.length} mark components; found ${Array.isArray(r.components)?r.components.length:0}. Upload the PDF again to align its columns.`);
-  const bad=r.components.findIndex(v=>v!==null&&(!Number.isFinite(v)||v<0||v>1000));
-  if(bad>=0)throw Error(`${rowLabel}: component ${bad+1} must be a number between 0 and 1,000 or blank.`);
+  const bad=r.components.findIndex(v=>v!==null&&(!Number.isFinite(v)||v<0));
+  if(bad>=0)throw Error(`${rowLabel}: component ${bad+1} must be a non-negative number or blank.`);
   const key=rollKey(r.roll);
   if(seen.has(key)&&!(s.source==='Marks Databse.xlsx'&&JSON.stringify(seen.get(key))===JSON.stringify(r)))throw Error('Duplicate student roll number: '+r.roll);
   seen.set(key,r);

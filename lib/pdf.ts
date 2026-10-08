@@ -10,7 +10,7 @@ export function parseLines(lines:TextLine[]){
  for(const page of new Set(lines.map(line=>line.page))){let roll:number|undefined,name:number|undefined;for(const line of lines.filter(line=>line.page===page))for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end);if(/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(label))roll=span.x+span.width/2;if(/student\s*name|^name$/i.test(label.trim()))name=span.x+span.width/2;}if(roll!==undefined&&name!==undefined)identityColumns.set(page,{roll,name});}
  let identityColumn:{roll:number;name:number}|undefined;
  const totalColumns=new Map<number,{x:number;tolerance:number}>();
- for(const line of lines){for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end),match=label.match(/\bTotal(?:\s+(?:Marks|Score))?\b/i);if(!match)continue;const center=/^\s*Total(?:\s+(?:Marks|Score))?(?:\s*[([][^\n]*)?\s*$/i.test(label)?label.length/2:match.index!+match[0].length/2;totalColumns.set(line.page,{x:span.x+span.width*center/Math.max(1,label.length),tolerance:Math.max(15,span.width/2+5)});}}
+ for(const line of lines){for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end),match=label.match(/\bTotal(?:\s+(?:Marks|Score))?(?=\b|\d)/i);if(!match)continue;const center=/^\s*Total(?:\s+(?:Marks|Score))?(?:\s*(?:[([][^\n]*|\d+(?:\.\d+)?%?))?\s*$/i.test(label)?label.length/2:match.index!+match[0].length/2;totalColumns.set(line.page,{x:span.x+span.width*center/Math.max(1,label.length),tolerance:Math.max(15,span.width/2+5)});}}
  let totalColumn:{x:number;tolerance:number}|undefined;
 
  const rows:MarkRow[]=[],issues:string[]=[],warnings:string[]=[];const seen=new Set<string>();let counts:number[]=[];
@@ -104,7 +104,10 @@ export function pdfTextLines(items:PdfTextItem[],page:number):TextLine[]{
  }
  const groupText=(group:typeof groups[number])=>[...group.items].sort((a,b)=>a.transform[4]-b.transform[4]).map(item=>item.str).join(' ');
  const consumed=new Set<typeof groups[number]>();
- const anchored=groups.map(group=>({group,roll:group.items.find(item=>{const match=item.str.trim().match(rollPattern);return match?.[0]===item.str.trim();})})).filter((entry):entry is {group:typeof groups[number];roll:PdfTextItem}=>!!entry.roll);
+ const rollHeading=items.find(item=>/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(item.str));
+ const nameHeading=items.find(item=>/student\s*name|^name$/i.test(item.str.trim()));
+ const idBoundary=rollHeading&&nameHeading?(rollHeading.transform[4]+rollHeading.width/2+nameHeading.transform[4]+nameHeading.width/2)/2:Infinity;
+ const anchored=groups.map(group=>({group,roll:group.items.find(item=>{const match=item.str.trim().match(rollPattern);return match?.[0]===item.str.trim()&&(item.transform[4]<idBoundary||/^(?:PGP|ABM|IEP|PHD)/i.test(item.str.trim()));})})).filter((entry):entry is {group:typeof groups[number];roll:PdfTextItem}=>!!entry.roll);
  for(const fragment of groups){
   if(anchored.some(entry=>entry.group===fragment)||consumed.has(fragment))continue;
   const left=Math.min(...fragment.items.map(item=>item.transform[4]));
@@ -113,7 +116,7 @@ export function pdfTextLines(items:PdfTextItem[],page:number):TextLine[]{
   candidates[0].group.items.push(...fragment.items);consumed.add(fragment);
  }
 
- const nameless=groups.filter(group=>{const text=groupText(group),roll=text.match(rollPattern);return roll&&/^(?:\s+\d+(?:\.\d+)?)+$/.test(text.slice(roll.index!+roll[0].length));});
+ const nameless=groups.filter(group=>{const text=groupText(group),roll=text.match(rollPattern);return roll&&/^(?:\s+\d+(?:\.\d+)?)+(?:\s+G\s*\d+)?$/i.test(text.slice(roll.index!+roll[0].length));});
  for(const group of groups){
   if(consumed.has(group))continue;
   if(!/^[\p{L}][\p{L} .'-]*$/u.test(groupText(group)))continue;
@@ -164,7 +167,7 @@ export async function extractPdf(file:File){
 }
 export function parsePdfLines(lines:TextLine[]){
  const full=lines.map(l=>l.text).join('\n');
- const hasTotal=lines.some(line=>(line.spans??[]).some(span=>/\bTotal(?:\s+(?:Marks|Score))?\b/i.test(line.text.slice(span.start,span.end))));
+ const hasTotal=lines.some(line=>(line.spans??[]).some(span=>/\bTotal(?:\s+(?:Marks|Score))?(?=\b|\d)/i.test(line.text.slice(span.start,span.end))));
  const fsa=!hasTotal?prepareFsaLines(lines):null;
  const parsed=parseLines(fsa?.lines??lines);
  if(!hasTotal&&!fsa)parsed.issues.push('Could not identify a Total Marks column heading. Upload a sheet with a clearly labelled total column; group numbers will not be used as marks.');

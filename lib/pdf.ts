@@ -140,16 +140,63 @@ export function pdfTextLines(items:PdfTextItem[],page:number):TextLine[]{
   return {text,page,spans};
  });
 }
+let workerUrl:string|undefined;
 export async function extractPdf(file:File){
- const pdfjs=await import('pdfjs-dist');pdfjs.GlobalWorkerOptions.workerSrc=new URL('pdf.worker.min.mjs',document.baseURI).href;
+ const pdfjs=await import('pdfjs-dist');
+ // Keep the matching worker inside the app bundle, including fake-worker fallback.
+ // No extra network request or deployment-dependent public worker URL is needed.
+ const {default:workerSource}=await import('pdfjs-dist/build/pdf.worker.min.mjs?raw');
+ workerUrl??=URL.createObjectURL(new Blob([workerSource],{type:'text/javascript'}));
+ pdfjs.GlobalWorkerOptions.workerSrc=workerUrl;
  const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),useSystemFonts:true});
  const doc=await task.promise;
  const lines:TextLine[]=[];
  try{for(let p=1;p<=doc.numPages;p++){const content=await (await doc.getPage(p)).getTextContent();const items=content.items.filter((x:any)=>'str'in x) as PdfTextItem[];lines.push(...pdfTextLines(items,p));}}
  finally{await task.destroy();}
- const parsed=parseLines(lines);
- if(!lines.some(line=>(line.spans??[]).some(span=>/\bTotal(?:\s+(?:Marks|Score))?\b/i.test(line.text.slice(span.start,span.end)))))parsed.issues.push('Could not identify a Total Marks column heading. Upload a sheet with a clearly labelled total column; group numbers will not be used as marks.');
- const full=lines.map(l=>l.text).join('\n');const course=full.match(/Course\s*:?\s*(.+)/i)?.[1]?.trim();
- const columns=parsed.count===4&&/SUPPLY CHAIN ANALYTICS/i.test(full)?['Mid-Term (20)','Assignments / Quizzes / CP (20)','Project (30)','End-Term (30)']:Array.from({length:parsed.count},(_,i)=>`Component ${i+1}`);
+ return parsePdfLines(lines);
+}
+export function parsePdfLines(lines:TextLine[]){
+ const full=lines.map(l=>l.text).join('\n');
+ const hasTotal=lines.some(line=>(line.spans??[]).some(span=>/\bTotal(?:\s+(?:Marks|Score))?\b/i.test(line.text.slice(span.start,span.end))));
+ const fsa=!hasTotal?prepareFsaLines(lines):null;
+ const parsed=parseLines(fsa?.lines??lines);
+ if(!hasTotal&&!fsa)parsed.issues.push('Could not identify a Total Marks column heading. Upload a sheet with a clearly labelled total column; group numbers will not be used as marks.');
+ if(fsa)parsed.warnings.push('FSA total = MT (25) + Quiz (20) + ET (35) + CP/project (20).');
+ const course=full.match(/Course\s*[:-]?\s*(.+)/i)?.[1]?.trim();
+ const columns=fsa?.columns??(parsed.count===4&&/SUPPLY CHAIN ANALYTICS/i.test(full)?['Mid-Term (20)','Assignments / Quizzes / CP (20)','Project (30)','End-Term (30)']:Array.from({length:parsed.count},(_,i)=>`Component ${i+1}`));
  return {...parsed,columns,course,pages:Math.max(...lines.map(l=>l.page),1)};
+}
+// Only FSA's explicitly approved weighted columns may supply a missing total.
+function prepareFsaLines(lines:TextLine[]){
+ if(!lines.some(line=>/\bCourse\s*[:-]?\s*FSA\b/i.test(line.text)))return null;
+ const labels=['MT=25','Quiz=20','ET=35','CP+project=20'];
+ const headers=new Map<number,{anchors:number[];start:number;totalX:number}>();
+ for(const line of lines){
+  const spans=line.spans??[],label=(span:NonNullable<TextLine['spans']>[number])=>line.text.slice(span.start,span.end).replace(/\s/g,'').toLowerCase();
+  const selected=labels.map(l=>spans.find(span=>label(span)===l.toLowerCase()));
+  const raw=spans.find(span=>label(span)==='mm25');
+  if(raw&&selected.every(s=>s!==undefined))headers.set(line.page,{anchors:selected.map(s=>s!.x+s!.width/2),start:raw.x-5,totalX:Math.max(...spans.map(s=>s.x+s.width))+30});
+ }
+ if(!headers.size)return null;
+ let header:ReturnType<typeof headers.get>;
+ const transformed:TextLine[]=[];
+ for(const line of lines){
+  header=headers.get(line.page)??header;
+  if(!header){transformed.push(line);continue;}
+  const spans=line.spans??[];
+  const isHeader=spans.some(span=>/roll\s*(?:no|number)/i.test(line.text.slice(span.start,span.end)));
+  const isRow=!isHeader&&/^\s*\d+\s+/.test(line.text)&&/\p{L}/u.test(line.text);
+  if(!isHeader&&!isRow){transformed.push(line);continue;}
+  const prefix=spans.filter(span=>span.x<header!.start).map(span=>({str:line.text.slice(span.start,span.end),x:span.x,width:span.width}));
+  const values=header.anchors.map(x=>{
+   const candidates=spans.filter(span=>/^\d+(?:\.\d+)?$/.test(line.text.slice(span.start,span.end).trim())&&Math.abs(span.x+span.width/2-x)<12);
+   return candidates.length===1?Number(line.text.slice(candidates[0].start,candidates[0].end)):null;
+  });
+  const total=values.every((v):v is number=>v!==null)?values.reduce((a,b)=>a+b,0):null;
+  const cells=[...prefix,...header.anchors.map((x,i)=>({str:isHeader?labels[i]:String(values[i]??'-'),x:x-3,width:6})),{str:isHeader?'Total':String(total??'-'),x:header.totalX,width:10}];
+  let text='';const out:NonNullable<TextLine['spans']>=[];
+  for(const cell of cells){if(text)text+=' ';const start=text.length;text+=cell.str;out.push({start,end:text.length,x:cell.x,width:cell.width});}
+  transformed.push({text,page:line.page,spans:out});
+ }
+ return {lines:transformed,columns:['MT (25)','Quiz (20)','ET (35)','CP / project (20)']};
 }

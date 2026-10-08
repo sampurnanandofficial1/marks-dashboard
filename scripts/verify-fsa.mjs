@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {parsePdfLines} from '../lib/pdf.ts';
+const line=(cells)=>{let text='';const spans=[];for(const [str,x] of cells){if(text)text+=' ';const start=text.length;text+=str;spans.push({start,end:text.length,x,width:6});}return {text,page:1,spans};};
+const heading=line([['S.No.',10],['Roll No',50],['Student Name',100],['MM 25',200],['MT=25',240],['Q2=25',280],['Q3=25',320],['Quiz=50',360],['Quiz=20',400],['ET=35',440],['CP+project=20',480]]);
+const row=line([['1',10],['PhD-26008',50],['TEST STUDENT',100],['99',200],['23',240],['99',280],['99',320],['99',360],['16.4',400],['24',440],['16',480]]);
+const source=[line([['Course-FSA',10]]),heading,row];
+const result=parsePdfLines(source);
+assert.deepEqual(result.issues,[]);assert.equal(result.rows.length,1);assert.deepEqual(result.rows[0].components,[23,16.4,24,16]);assert.equal(result.rows[0].total,79.4);assert.equal(result.columns.length,4);
+const missing={...row,spans:row.spans.filter(span=>span.x!==400)};
+assert(parsePdfLines([source[0],heading,missing]).issues.length>0,'Missing weighted marks must be identified');
+assert(parsePdfLines([heading,row]).issues.some(issue=>issue.includes('Total Marks column heading')),'No implicit total for unrelated courses');
+console.log('Passed: FSA sums only approved weighted columns, preserves PhD students, rejects missing marks and unrelated no-total sheets.');

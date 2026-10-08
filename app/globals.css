@@ -172,3 +172,54 @@ input[type=file]::file-selector-button { background:#284858; color:#f1f5ff; bord
 @media(max-width:480px) { .page-title{flex-wrap:wrap;gap:16px}.page-title .primary{width:100%;font-size:14px!important}.header-right{gap:8px}.brand{font-size:12px}.hero-card{padding:22px 20px}.hero-top>svg{width:30px}.hero-bottom{gap:12px}.gpa{font-size:50px}.gpa-ring{width:88px;height:88px}.gpa-ring>span{width:76px;height:76px;font-size:20px}.gpa-label{font-size:12px;max-width:175px}.mini-cards{gap:8px}.mini{padding:14px 10px}.mini strong{font-size:21px}.term-bars{gap:10px}.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.section-title{flex-wrap:wrap}.sheet-controls>*{width:100%}.sheet-controls [data-slot=select-trigger]{width:100%;min-width:0}.dialog-actions{flex-wrap:wrap}.access-page form{padding:28px}.bands{grid-template-columns:repeat(2,1fr)} }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; animation:none!important; } }
 @media print { :root{color-scheme:light}body,.app,main{background:white!important;color:#111!important}.panel,.mini,.insight,.method{background:white!important;color:#111!important;box-shadow:none!important;border-color:#bbb!important}.mini strong,h3,td,td.subject-name,.term-bar strong,.term-bar>span{color:#111!important}p,.quiet,.mini>div>span,.mini small,.term-bar small{color:#444!important}th{background:#eee!important;color:#222!important}.hero-card{background:#143b46!important}.bar-track{background:#eee!important}.grade-chip{background:#eee!important;color:#222!important}.grade-big{color:#244e36!important} }
+
+/* A dedicated document layout avoids inheriting dashboard controls and colours. */
+.print-report{display:none}
+@media print{
+ @page{size:A4 portrait;margin:14mm 12mm 14mm}
+ html,body,.app{background:#fff!important;color:#172b3a!important;min-width:0!important}
+ .app>.topbar,.app>main>*:not(.print-report),.app>[data-slot=dialog-overlay],.app>[data-slot=dialog-content]{display:none!important}
+ .app>main{margin:0!important;padding:0!important;max-width:none!important;width:100%!important}
+ .print-report{display:block!important;font-family:Arial,Helvetica,sans-serif;color:#172b3a!important;font-size:10pt;line-height:1.45;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .print-report *{box-shadow:none!important;text-shadow:none!important}
+ .print-report p,.print-report span,.print-report small{color:inherit}
+ .print-brand{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #157b7c;padding-bottom:5mm;margin-bottom:7mm;break-inside:avoid}
+ .print-brand strong{display:block;font-size:12pt;letter-spacing:1.4px;color:#154455}
+ .print-brand div>span{display:block;font-size:8pt;margin-top:1mm;color:#4b6171}
+ .print-document{font-size:8pt;letter-spacing:1.3px;font-weight:700;color:#155e65!important}
+ .print-identity{display:flex;justify-content:space-between;align-items:center;gap:8mm;border-left:4px solid #157b7c;background:#f0f7f7;padding:6mm;break-inside:avoid}
+ .print-kicker{text-transform:uppercase;font-size:8pt!important;font-weight:700;letter-spacing:1.2px;color:#155e65!important}
+ .print-identity h1{font-size:23pt;line-height:1.18;letter-spacing:-.6px;margin:2mm 0;color:#172b3a}
+ .print-id{font-size:10pt!important;font-weight:600;color:#405867!important}
+ .print-score{flex-shrink:0;text-align:right}
+ .print-score>span{font-size:8pt;font-weight:700;display:block;color:#405867!important}
+ .print-score strong{display:block;font-size:30pt;line-height:1.3;color:#155e65}
+ .print-score small{font-size:10pt;font-weight:400;color:#405867!important}
+ .print-summary{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:5mm;padding:5mm 0;border-bottom:1px solid #c7d8df;break-inside:avoid}
+ .print-summary>div{padding-left:3mm;border-left:2px solid #c7d8df}
+ .print-summary span{display:block;text-transform:uppercase;font-size:7.5pt;letter-spacing:.8px;color:#4b6171!important}
+ .print-summary strong{display:block;margin-top:1mm;font-size:14pt;font-weight:700}
+ .print-summary>div:last-child strong{font-size:10pt;margin-top:2mm}
+ .print-terms{display:flex;gap:4mm;margin-top:5mm;flex-wrap:wrap;break-inside:avoid}
+ .print-terms>div{background:#f4f7fa;border:1px solid #d0dee5;border-radius:2mm;padding:3mm 5mm;flex:1}
+ .print-terms span,.print-terms small{display:block;font-size:8pt;color:#405867!important}
+ .print-terms strong{font-size:15pt;color:#155e65}
+ .print-results{margin-top:7mm}
+ .print-results h2{font-size:13pt;font-weight:700;break-after:avoid;margin:0;color:#172b3a}
+ .print-caption{font-size:8pt!important;color:#4b6171!important;margin:1mm 0 3mm;break-after:avoid}
+ .print-report table{border-collapse:collapse;width:100%;table-layout:auto;font-size:9pt!important;border:1px solid #c7d8df}
+ .print-report thead{display:table-header-group}
+ .print-report tfoot{display:table-row-group}
+ .print-report tr{break-inside:avoid}
+ .print-report th{background:#e7f1f3!important;color:#153e4c!important;text-align:left;font-weight:700!important;font-size:8pt!important;height:auto!important;padding:3mm 2mm!important;border-bottom:1px solid #a9c6cf;white-space:normal}
+ .print-report td{color:#172b3a!important;font-size:9pt!important;padding:2.7mm 2mm!important;border-bottom:1px solid #d7e2e8;white-space:nowrap}
+ .print-report td:first-child{white-space:normal;width:24%;font-weight:600}
+ .print-report tbody tr:nth-child(even){background:#f4f7fa!important}
+ .print-report td:first-child small{display:block;font-size:7pt;color:#4b6171!important;font-weight:400}
+ .print-grade{display:inline-block;min-width:9mm;text-align:center;background:#e2edef;color:#174953!important;border:1px solid #b7cfd3;border-radius:1mm;padding:.6mm 1mm;font-weight:700;font-size:9pt}
+ .print-grade.excellent{background:#e5f2e9;color:#23553b!important;border-color:#b3d5bf}
+ .print-grade.developing{background:#fbefdf;color:#744714!important;border-color:#e8cda7}
+ .print-report tfoot td{background:#e7f1f3!important;font-weight:700;color:#153e4c!important;border-top:2px solid #94b9c3;white-space:normal;font-size:8pt!important}
+ .print-report tfoot td:last-child{font-size:11pt!important}
+ .print-report .print-footer{display:flex!important;justify-content:space-between;margin-top:6mm;padding-top:3mm;border-top:1px solid #c7d8df;font-size:7.5pt;color:#4b6171;break-inside:avoid}
+}

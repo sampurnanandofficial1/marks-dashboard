@@ -15,7 +15,7 @@ export function parseLines(lines:TextLine[]){
   totalColumn=totalColumns.get(page)??totalColumn;
   identityColumn=identityColumns.get(page)??identityColumn;
 
-  const tableRow=!!(identityColumn&&totalColumn&&spans&&/^\s*\d+\s+/.test(text));
+  const tableRow=!!(identityColumn&&totalColumn&&spans&&spans.some(span=>span.x>=(identityColumn!.roll+identityColumn!.name)/2&&span.x<totalColumn!.x&&/\p{L}/u.test(text.slice(span.start,span.end)))&&(/^\s*\d+\s+/.test(text)||spans.some(span=>span.x>=identityColumn!.roll-(identityColumn!.name-identityColumn!.roll)/2&&span.x<(identityColumn!.roll+identityColumn!.name)/2&&!/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(text.slice(span.start,span.end)))));
   const knownId=/(?:PGP|ABM|IEP|PHD)\s*[\/ -]?\s*\d{2}\s*[\/ -]?\s*\d{3,}R?/i;
   const genericRow=(/^\s*\d+\s+/.test(text)||/^\s*\S*\d\S*\s+/.test(text))&&/\p{L}.*\s+(?:\d+(?:\.\d+)?|AB|ABS|NA|--|-)\s*$/iu.test(text);
   if(!tableRow&&!knownId.test(text)&&!genericRow)continue;
@@ -97,8 +97,18 @@ export function pdfTextLines(items:PdfTextItem[],page:number):TextLine[]{
  }
  const groupText=(group:typeof groups[number])=>[...group.items].sort((a,b)=>a.transform[4]-b.transform[4]).map(item=>item.str).join(' ');
  const consumed=new Set<typeof groups[number]>();
+ const anchored=groups.map(group=>({group,roll:group.items.find(item=>{const match=item.str.trim().match(rollPattern);return match?.[0]===item.str.trim();})})).filter((entry):entry is {group:typeof groups[number];roll:PdfTextItem}=>!!entry.roll);
+ for(const fragment of groups){
+  if(anchored.some(entry=>entry.group===fragment)||consumed.has(fragment))continue;
+  const left=Math.min(...fragment.items.map(item=>item.transform[4]));
+  const candidates=anchored.filter(({group,roll})=>left>roll.transform[4]+roll.width&&Math.abs(group.y-fragment.y)<=Math.max(...fragment.items.map(item=>item.height),roll.height)).sort((a,b)=>Math.abs(a.group.y-fragment.y)-Math.abs(b.group.y-fragment.y));
+  if(!candidates.length||candidates.length>1&&Math.abs(Math.abs(candidates[0].group.y-fragment.y)-Math.abs(candidates[1].group.y-fragment.y))<1)continue;
+  candidates[0].group.items.push(...fragment.items);consumed.add(fragment);
+ }
+
  const nameless=groups.filter(group=>{const text=groupText(group),roll=text.match(rollPattern);return roll&&/^(?:\s+\d+(?:\.\d+)?)+$/.test(text.slice(roll.index!+roll[0].length));});
  for(const group of groups){
+  if(consumed.has(group))continue;
   if(!/^[\p{L}][\p{L} .'-]*$/u.test(groupText(group)))continue;
   const x=Math.min(...group.items.map(item=>item.transform[4]));
   const candidates=nameless.filter(target=>{

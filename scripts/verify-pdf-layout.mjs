@@ -67,3 +67,8 @@ assert.equal(universal.rows[4].roll,'UNASSIGNED/P1/R5');assert.equal(universal.w
 validateSubject({name:'Universal',term:4,credit:1,columns:['Mark'],rows:universal.rows,source:'test.pdf'});
 assert(calculate(universal.rows).every(r=>r.cohort===5));
 console.log('Passed: arbitrary prefixes, numeric IDs, letter-only IDs and missing IDs all enter the grading cohort.');
+
+const noSerial=parseLines([universalHeader,universalRow('','VISITOR')]);assert.deepEqual(noSerial.issues,[]);assert.equal(noSerial.rows[0].roll,'VISITOR');
+const splitMarks=[item('1',50,100),item('PGP/41/001',145,100),item('TEST STUDENT',220,104.5),item('10',300,100),item('20',350,95.5),item('30',400,95.5)];
+const splitResult=parseLines(pdfTextLines(splitMarks,1));assert.deepEqual(splitResult.issues,[]);assert.equal(splitResult.rows[0].total,30);assert.deepEqual(splitResult.rows[0].components,[10,20]);
+console.log('Passed: rows without serial numbers and split-baseline marks are kept complete.');

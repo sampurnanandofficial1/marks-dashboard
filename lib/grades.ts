@@ -62,7 +62,8 @@ export function applyReportCredits(subjects:Subject[]):Subject[]{
 export function studentId(roll:string){
  const compact=roll.replace(/[\s/\-]/g,'').toUpperCase();
  const match=compact.match(/^(PGP|ABM|IEP|PHD)?(\d{2})(\d+)(R?)$/);
- if(!match)return '';
+ if(!compact)return '';
+ if(!match)return 'ID:'+roll.trim().replace(/\s+/g,'').toUpperCase();
  return (match[1]??'PGP')+'/'+match[2]+'/'+match[3].padStart(3,'0')+match[4];
 }
 export function studentReport(subjects:Subject[],roll:string){
@@ -88,7 +89,7 @@ export function validateSubject(s:Subject){
  for(const [i,r] of s.rows.entries()){
   const label=`Student row ${i+1}`;
   if(!r||typeof r.name!=='string'||!r.name.trim())throw Error(`${label}: student name is missing.`);
-  if(typeof r.roll!=='string'||!/^(?:PGP|ABM|IEP|PHD)\/\d{2}\/\d+R?$/i.test(normalizeRoll(r.roll)))throw Error(`${label}: unrecognized roll number. Expected PGP/41/001 or ABM/22/001; returning-student suffix R is allowed.`);
+  if(typeof r.roll!=='string'||!r.roll.trim())throw Error(`${label}: student identifier is missing.`);
   r.roll=normalizeRoll(r.roll);
   const rowLabel=`${label} (${r.roll})`;
   if(!Number.isFinite(r.total)||r.total<0)throw Error(`${rowLabel}: total marks must be a non-negative number.`);

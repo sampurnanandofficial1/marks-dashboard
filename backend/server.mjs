@@ -22,9 +22,15 @@ createServer(async(req,res)=>{
  if(req.method==='OPTIONS'){res.writeHead(204);return res.end();}
  const token=(req.headers.authorization??'').replace(/^Bearer /,'');
  if(!timingSafeEqual(createHash('sha256').update(token).digest(),expected))return send(401,{error:'Enter the correct access code to open your marks.'});
+ if(req.method==='GET'&&/^\/api\/subjects\/[^/]+\/pdf$/.test(req.url??'')){
+  try{const id=decodeURIComponent(req.url.slice('/api/subjects/'.length,-'/pdf'.length)),record=db.prepare('SELECT pdf_key FROM subjects WHERE id=?').get(id);
+   if(!record?.pdf_key)return send(404,{error:'No uploaded PDF for this subject.'});
+   const bytes=await fs.readFile(root+'/'+record.pdf_key);res.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':'inline'});return res.end(bytes);
+  }catch{return send(404,{error:'The original PDF is unavailable.'});}
+ }
  if(req.url!=='/api/subjects')return send(404,{error:'Not found.'});
  try{
-  if(req.method==='GET'){const merged=new Map(seed.subjects.map(s=>[s.id,s]));for(const r of db.prepare('SELECT id,data,pdf_key FROM subjects').all()){const saved=JSON.parse(r.data),original=merged.get(r.id);if(original&&!r.pdf_key&&saved.source===original.source){saved.rows=original.rows;saved.columns=original.columns;}merged.set(r.id,saved);}return send(200,{subjects:applyReportCredits([...merged.values()]),actual:seed.actual});}
+  if(req.method==='GET'){const merged=new Map(seed.subjects.map(s=>[s.id,s]));for(const r of db.prepare('SELECT id,data,pdf_key FROM subjects').all()){const saved=JSON.parse(r.data),original=merged.get(r.id);if(original&&!r.pdf_key&&saved.source===original.source&&saved.rows.length<original.rows.length){saved.rows=original.rows;saved.columns=original.columns;}merged.set(r.id,saved);}return send(200,{subjects:applyReportCredits([...merged.values()]),actual:seed.actual});}
   if(req.method!=='POST')return send(405,{error:'Method not allowed.'});
   const parts=[];for await(const chunk of req){parts.push(chunk);}
   const request=new Request('http://internal/api/subjects',{method:'POST',headers:req.headers,body:Buffer.concat(parts)});

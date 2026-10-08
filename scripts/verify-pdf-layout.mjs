@@ -55,3 +55,15 @@ const programmes=parseLines(['IEP/26/001','PhD-26015'].map(roll=>({page:1,text:r
 assert.deepEqual(programmes.rows.map(r=>r.roll),['IEP/26/001','PHD/26/015']);
 validateSubject({name:'Mixed programmes',term:4,credit:1,columns:['A','B','C'],rows:programmes.rows,source:'test.pdf'});
 console.log('Passed: Total Marks heading overrides trailing group numbers across continuation pages; IEP and PhD students included.');
+
+const universalHeader={page:1,text:'Roll No Student Name Total Marks',spans:[{start:0,end:7,x:135,width:30},{start:8,end:20,x:220,width:60},{start:21,end:32,x:335,width:40}]};
+const universalRow=(serial,id)=>{
+ const cells=[[serial,50],...(id?[[id,145]]:[]),['TEST STUDENT',220],['10',290],['20',350],['9',400]];let text='';const spans=[];
+ for(const [value,x] of cells){if(text)text+=' ';const start=text.length;text+=value;spans.push({start,end:text.length,x,width:20});}return {text,page:1,spans};
+};
+const universal=parseLines([universalHeader,...['EXEC-2026-7','987654','VISITOR','CUSTOM/12/XYZ',''].map((id,i)=>universalRow(String(i+1),id))]);
+assert.deepEqual(universal.issues,[]);assert.equal(universal.rows.length,5);assert(universal.rows.every(r=>r.total===20));
+assert.equal(universal.rows[4].roll,'UNASSIGNED/P1/R5');assert.equal(universal.warnings.length,1);
+validateSubject({name:'Universal',term:4,credit:1,columns:['Mark'],rows:universal.rows,source:'test.pdf'});
+assert(calculate(universal.rows).every(r=>r.cohort===5));
+console.log('Passed: arbitrary prefixes, numeric IDs, letter-only IDs and missing IDs all enter the grading cohort.');

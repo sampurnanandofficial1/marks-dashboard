@@ -32,3 +32,8 @@ assert.equal(studentId(' pgp / 41 / 221 '),studentId('PGP41221'));
 console.log('Identity checks passed: name changes, shared names, ID formats, programme separation and returning-student suffixes.');
 
 assert.equal(studentId('PGP/41/1R'),studentId('PGP41001R'));
+
+const unrestricted={id:'unrestricted',name:'Any programme',term:4,credit:1,columns:[],source:'test.pdf',rows:[{roll:'EXEC-2026-7',name:'First',section:'',components:[],total:30},{roll:'VISITOR',name:'Second',section:'',components:[],total:80}]};
+assert.equal(studentReport([unrestricted],'exec-2026-7')[0].result.cohort,2);
+assert.equal(studentReport([unrestricted],'VISITOR')[0].result.total,80);
+assert.notEqual(studentId('EXEC-2026-7'),studentId('VISITOR'));

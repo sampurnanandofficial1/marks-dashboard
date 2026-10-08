@@ -18,7 +18,10 @@ function Choice({value,onChange,items,label}:{value:string;onChange:(v:string)=>
 
 function StudentPicker({items,value,onChange}:{items:string[];value:string;onChange:(value:string)=>void}){
  const [query,setQuery]=useState('');
- return <Combobox items={items} value={value||null} inputValue={query} onInputValueChange={setQuery} onOpenChange={open=>{if(open)setQuery('');}} onValueChange={v=>{if(v)onChange(v);}} autoHighlight filter={(item:string,search:string)=>search.trim().toLowerCase().split(/\s+/).every(word=>item.toLowerCase().includes(word))}>
+ const normalize=(text:string)=>text.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const words=normalize(query).trim().split(/\s+/).filter(Boolean);
+ const matches=items.filter(item=>{const label=normalize(item),compact=label.replace(/[^a-z0-9]/g,'');return words.every(word=>label.includes(word)||compact.includes(word.replace(/[^a-z0-9]/g,'')));});
+ return <Combobox items={items} filteredItems={matches} filter={null} value={value||null} inputValue={query} onInputValueChange={setQuery} onOpenChange={(open,details)=>{if(open&&details.reason!=='input-change')setQuery('');}} onValueChange={v=>{if(v)onChange(v);}} autoHighlight>
   <ComboboxTrigger aria-label="Select student" render={<Button variant="outline"/>} style={{width:'100%',minHeight:44,justifyContent:'space-between',textAlign:'left'}}>
    <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{value||'Select a student'}</span>
   </ComboboxTrigger>

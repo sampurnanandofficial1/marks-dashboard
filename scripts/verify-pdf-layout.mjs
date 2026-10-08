@@ -45,3 +45,13 @@ assert.equal(ambiguous.rows.length,0);
 const distant=parseLines(pdfTextLines([...row(100,'1','TEST STUDENT',['10','20']),item('PGP/41/001',152,80)],2));
 assert.equal(distant.rows.length,0);assert(distant.issues.length>0);
 console.log('Passed: displaced roll baselines recovered; ambiguous and distant fragments rejected.');
+
+const totalHeader={text:'Project Mid Term End Term Total Marks Group Number',page:1,spans:[{start:26,end:37,x:335,width:40}]};
+const grouped=line('020',[['25.5',200],['18',250],['22',300],['65.5',350],['4',400]]);
+const totalColumn=parseLines([totalHeader,grouped,{...line('021',[['23',200],['22',250],['23',300],['68',350],['8',400]]),page:2}]);
+assert.deepEqual(totalColumn.issues,[]);assert.deepEqual(totalColumn.rows.map(r=>r.total),[65.5,68]);
+assert.deepEqual(totalColumn.rows[0].components,[25.5,18,22]);assert.equal(totalColumn.count,3);
+const programmes=parseLines(['IEP/26/001','PhD-26015'].map(roll=>({page:1,text:roll+' TEST STUDENT 25 26 26 77'})));
+assert.deepEqual(programmes.rows.map(r=>r.roll),['IEP/26/001','PHD/26/015']);
+validateSubject({name:'Mixed programmes',term:4,credit:1,columns:['A','B','C'],rows:programmes.rows,source:'test.pdf'});
+console.log('Passed: Total Marks heading overrides trailing group numbers across continuation pages; IEP and PhD students included.');

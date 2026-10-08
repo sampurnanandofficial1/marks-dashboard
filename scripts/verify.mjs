@@ -1,25 +1,20 @@
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {calculate,rollKey,validateSubject,bands} from '../lib/grades.ts';
-import {parseLines} from '../lib/pdf.ts';
+import {parseLines,pdfTextLines} from '../lib/pdf.ts';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 const sample=process.argv[2];if(!sample)throw Error('Pass the SCAS sample PDF path as the first argument.');
 const task=pdfjs.getDocument({data:new Uint8Array(await fs.readFile(sample)),useSystemFonts:true});
 const doc=await task.promise,lines=[];
 for(let page=1;page<=doc.numPages;page++){
- const content=await (await doc.getPage(page)).getTextContent(),groups=[];
- for(const item of content.items.filter(i=>'str' in i&&i.str.trim())){
-  const y=item.transform[5];let g=groups.find(g=>Math.abs(g.y-y)<3);
-  if(!g){g={y,items:[]};groups.push(g);}g.items.push(item);
- }
- for(const g of groups.sort((a,b)=>b.y-a.y))lines.push({page,text:g.items.sort((a,b)=>a.transform[4]-b.transform[4]).map(i=>i.str).join(' ')});
+ const content=await (await doc.getPage(page)).getTextContent();lines.push(...pdfTextLines(content.items.filter(i=>'str' in i),page));
 }
 await task.destroy();
 const parsed=parseLines(lines);
-assert.equal(parsed.rows.length,117);assert.deepEqual(parsed.issues,[]);assert.equal(parsed.count,4);
+assert.equal(parsed.rows.length,118);assert.deepEqual(parsed.issues,[]);assert.equal(parsed.count,4);
 const seed=JSON.parse(await fs.readFile(new URL('../lib/seed.json',import.meta.url)));
 const scas=seed.subjects.find(s=>s.name==='SCAS'),map=new Map(scas.rows.map(r=>[rollKey(r.roll),r]));
-for(const r of parsed.rows){const s=map.get(rollKey(r.roll));assert(s);assert.equal(r.name,s.name);assert.equal(r.total,s.total);assert.deepEqual(r.components,s.components);}
+for(const r of parsed.rows){const s=map.get(rollKey(r.roll));if(!s){assert(r.roll.startsWith('IEP/'));continue;}assert.equal(r.name,s.name);assert.equal(r.total,s.total);assert.deepEqual(r.components,s.components);}
 assert.equal(parsed.rows.find(r=>rollKey(r.roll)==='41221').total,69);
 const calc=calculate(parsed.rows);const me=calc.find(r=>rollKey(r.roll)==='41221');assert.equal(me.grade,'B-');assert.equal(me.point,5);
 const rows=[1,2,2,3].map((total,i)=>({total,name:'Test '+i,roll:'PGP/41/00'+i,section:'A',components:[]}));

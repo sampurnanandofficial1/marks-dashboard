@@ -2,7 +2,7 @@ export type MarkRow={roll:string;name:string;section:string;components:(number|n
 export type Subject={id:string;name:string;term:number;credit:number;columns:string[];rows:MarkRow[];source:string;updatedAt:string|null};
 export const bands:[number,string,number][]=[[.95,'A+',10],[.85,'A',9],[.75,'A-',8],[.5334,'B+',7],[.3168,'B',6],[.1002,'B-',5],[.05,'C+',4],[.025,'C',3],[.01,'C-',2],[0,'D',1]];
 export const rollKey=(s:string)=>s.replace(/[^0-9]/g,'');
-export const normalizeRoll=(s:string)=>s.replace(/\s/g,'').toUpperCase().replace(/^(PGP|ABM)[ /]?(\d{2})[ /]?(\d+R?)$/,'$1/$2/$3');
+export const normalizeRoll=(s:string)=>s.replace(/\s/g,'').toUpperCase().replace(/^(PGP|ABM|IEP|PHD)[ /-]?(\d{2})[ /-]?(\d+R?)$/,'$1/$2/$3');
 // Excel PERCENTRANK.EXC with the omitted significance argument (three decimals).
 // Build one complete subject range; a displayed filter or sort never changes it.
 function exclusivePercentileRange(values:number[]){
@@ -60,8 +60,8 @@ export function applyReportCredits(subjects:Subject[]):Subject[]{
  return subjects.map(s=>s.name.trim().toLowerCase()==='esgmr'?{...s,term:4,credit:1}:s);
 }
 export function studentId(roll:string){
- const compact=roll.replace(/[\s/]/g,'').toUpperCase();
- const match=compact.match(/^(PGP|ABM)?(\d{2})(\d+)(R?)$/);
+ const compact=roll.replace(/[\s/\-]/g,'').toUpperCase();
+ const match=compact.match(/^(PGP|ABM|IEP|PHD)?(\d{2})(\d+)(R?)$/);
  if(!match)return '';
  return (match[1]??'PGP')+'/'+match[2]+'/'+match[3].padStart(3,'0')+match[4];
 }
@@ -88,7 +88,7 @@ export function validateSubject(s:Subject){
  for(const [i,r] of s.rows.entries()){
   const label=`Student row ${i+1}`;
   if(!r||typeof r.name!=='string'||!r.name.trim())throw Error(`${label}: student name is missing.`);
-  if(typeof r.roll!=='string'||!/^(?:PGP|ABM)\/\d{2}\/\d+R?$/i.test(normalizeRoll(r.roll)))throw Error(`${label}: unrecognized roll number. Expected PGP/41/001 or ABM/22/001; returning-student suffix R is allowed.`);
+  if(typeof r.roll!=='string'||!/^(?:PGP|ABM|IEP|PHD)\/\d{2}\/\d+R?$/i.test(normalizeRoll(r.roll)))throw Error(`${label}: unrecognized roll number. Expected PGP/41/001 or ABM/22/001; returning-student suffix R is allowed.`);
   r.roll=normalizeRoll(r.roll);
   const rowLabel=`${label} (${r.roll})`;
   if(!Number.isFinite(r.total)||r.total<0)throw Error(`${rowLabel}: total marks must be a non-negative number.`);

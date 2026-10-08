@@ -4,17 +4,22 @@ export const bands:[number,string,number][]=[[.95,'A+',10],[.85,'A',9],[.75,'A-'
 export const rollKey=(s:string)=>s.replace(/[^0-9]/g,'');
 export const normalizeRoll=(s:string)=>s.replace(/\s/g,'').toUpperCase().replace(/^(PGP|ABM)[ /]?(\d{2})[ /]?(\d+R?)$/,'$1/$2/$3');
 // Excel PERCENTRANK.EXC with the omitted significance argument (three decimals).
-export function percentRankExc(values:number[],x:number):number|null{
+// Build one complete subject range; a displayed filter or sort never changes it.
+function exclusivePercentileRange(values:number[]){
  const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);
- if(!sorted.length||!Number.isFinite(x)||x<sorted[0]||x>sorted[sorted.length-1])return null;
- const exact=sorted.indexOf(x);
- let rank:number;
- if(exact>=0)rank=(exact+1)/(sorted.length+1);
- else{
-  const upper=sorted.findIndex(v=>v>x),lower=upper-1;
-  rank=(lower+1+(x-sorted[lower])/(sorted[upper]-sorted[lower]))/(sorted.length+1);
- }
- return Math.floor((rank+Number.EPSILON)*1000)/1000;
+ return (x:number):number|null=>{
+  if(!sorted.length||!Number.isFinite(x)||x<sorted[0]||x>sorted[sorted.length-1])return null;
+  let low=0,high=sorted.length;
+  while(low<high){const middle=Math.floor((low+high)/2);if(sorted[middle]<x)low=middle+1;else high=middle;}
+  // Excel gives tied values the first ascending position, independently of rank.
+  let position=low+1;
+  if(sorted[low]!==x){const previous=low-1;position=low+(x-sorted[previous])/(sorted[low]-sorted[previous]);}
+  const percentile=position/(sorted.length+1);
+  return Math.floor((percentile+Number.EPSILON)*1000)/1000;
+ };
+}
+export function percentRankExc(values:number[],x:number):number|null{
+ return exclusivePercentileRange(values)(x);
 }
 export function gradeFromPercentile(percentile:number|null){
  return percentile===null?null:bands.find(b=>percentile>=b[0])?.[1]??'D';
@@ -23,16 +28,25 @@ export function gradePoint(grade:string|null){
  return grade===null?null:bands.find(b=>b[1]===grade)?.[2]??0;
 }
 export function calculate(rows:MarkRow[]){
- const n=rows.length,avg=n?rows.reduce((s,r)=>s+r.total,0)/n:0;
- const sd=n?Math.sqrt(rows.reduce((s,r)=>s+(r.total-avg)**2,0)/n):0;
- const zScores=rows.map(r=>sd>0?(r.total-avg)/sd:null);
- const numericZ=zScores.filter((z):z is number=>z!==null);
- return rows.map((r,i)=>{
-  // RANK.EQ(total, totals, 0) + COUNTIF(current row through last row, total) - 1.
-  const rank=1+rows.filter(x=>x.total>r.total).length+rows.slice(i).filter(x=>x.total===r.total).length-1;
-  const z=zScores[i],percentile=z===null?null:percentRankExc(numericZ,z);
+ // I2:I(last row): the final printed total, including every student to the end.
+ // Component marks are never substituted for the supplied final total.
+ const totals=rows.map(row=>row.total),n=totals.length;
+ const avg=n?totals.reduce((sum,total)=>sum+total,0)/n:0;
+ const sd=n?Math.sqrt(totals.reduce((sum,total)=>sum+(total-avg)**2,0)/n):0;
+ const zScores=totals.map(total=>sd>0?(total-avg)/sd:null);
+ // K2:K(last row): full-precision Z-scores, before any display rounding.
+ const percentileOf=exclusivePercentileRange(zScores.filter((z):z is number=>z!==null));
+ const frequency=new Map<number,number>();for(const total of totals)frequency.set(total,(frequency.get(total)??0)+1);
+ const descending=[...frequency.keys()].sort((a,b)=>b-a),equalRanks=new Map<number,number>();
+ let higher=0;for(const total of descending){equalRanks.set(total,higher+1);higher+=frequency.get(total)!;}
+ const remaining=new Map(frequency);
+ return rows.map((row,i)=>{
+  // RANK.EQ(I2,I$2:I$last,0) + COUNTIF(I2:I$last,I2) - 1.
+  const rank=equalRanks.get(row.total)!+remaining.get(row.total)!-1;
+  remaining.set(row.total,remaining.get(row.total)!-1);
+  const z=zScores[i],percentile=z===null?null:percentileOf(z);
   const grade=gradeFromPercentile(percentile);
-  return {...r,rank,z,percentile,grade,point:gradePoint(grade),error:sd===0?'#DIV/0!':null,average:avg,cohort:n};
+  return {...row,rank,z,percentile,grade,point:gradePoint(grade),error:sd===0?'#DIV/0!':null,average:avg,cohort:n};
  });
 }
 export function weightedGpa(entries:{credit:number;point:number|null|undefined}[]){

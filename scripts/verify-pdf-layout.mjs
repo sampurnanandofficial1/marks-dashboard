@@ -28,3 +28,20 @@ const formats=parseLines(['PGP41/001','PGP/40002R','ABM 22 / 003'].map(roll=>({t
 assert.deepEqual(formats.rows.map(r=>r.roll),['PGP/41/001','PGP/40/002R','ABM/22/003']);
 validateSubject({name:'Mixed',term:4,credit:1,columns:['A','B'],rows:formats.rows,source:'test.pdf'});
 console.log('Passed: blank-cell column alignment, printed totals, safe totals-only fallback, explicit absences, duplicate and missing-total rejection.');
+
+const {pdfTextLines}=await import('../lib/pdf.ts');
+const item=(str,x,y)=>({str,width:20,height:7,transform:[7,0,0,7,x,y]});
+const row=(y,number,name,marks)=>[item(number,50,y),item('B',95,y),item(name,220,y),...marks.map((mark,i)=>item(mark,360+i*50,y))];
+const displaced=[...row(104.4,'51','TEST STUDENT',['26.5','5','9','26.5','67']),item('PGP/41/375',152,99.6),...row(90,'52','NEXT STUDENT',['37','5.75','9','39','90.75']),item('PGP/41/380',152,90)];
+const recovered=parseLines(pdfTextLines(displaced,2));
+assert.deepEqual(recovered.issues,[]);assert.equal(recovered.rows.length,2);
+assert.deepEqual(recovered.rows[0],{roll:'PGP/41/375',name:'TEST STUDENT',section:'B',components:[26.5,5,9,26.5],total:67});
+assert.equal(recovered.rows[1].roll,'PGP/41/380');
+const raised=parseLines(pdfTextLines([...row(104.4,'51','TEST STUDENT',['26.5','5','9','26.5','67']),item('PGP/41/375',152,109.2)],2));
+assert.deepEqual(raised.rows,recovered.rows.slice(0,1));
+const ambiguous=parseLines(pdfTextLines([...row(100,'1','FIRST STUDENT',['10','20']),...row(110,'2','SECOND STUDENT',['15','25']),item('PGP/41/001',152,105)],2));
+assert(ambiguous.issues.some(issue=>issue.includes('could not read')));
+assert.equal(ambiguous.rows.length,0);
+const distant=parseLines(pdfTextLines([...row(100,'1','TEST STUDENT',['10','20']),item('PGP/41/001',152,80)],2));
+assert.equal(distant.rows.length,0);assert(distant.issues.length>0);
+console.log('Passed: displaced roll baselines recovered; ambiguous and distant fragments rejected.');

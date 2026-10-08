@@ -50,12 +50,42 @@ export function parseLines(lines:TextLine[]){
  if(!rows.length)issues.push('No student rows were found. Upload a text-based result sheet with PGP or ABM roll numbers. Scanned PDFs need OCR before upload.');
  return {rows,issues,warnings,count};
 }
+type PdfTextItem={str:string;transform:number[];width:number;height:number};
+const rollPattern=/(?:PGP|ABM)\s*[\/ ]?\s*\d{2}\s*[\/ ]?\s*\d{3,}R?/i;
+export function pdfTextLines(items:PdfTextItem[],page:number):TextLine[]{
+ const groups:{y:number;items:PdfTextItem[]}[]=[];
+ for(const item of items.filter(item=>item.str?.trim())){
+  const y=item.transform[5];let group=groups.find(g=>Math.abs(g.y-y)<3);
+  if(!group){group={y,items:[]};groups.push(group);}group.items.push(item);
+ }
+ const groupText=(group:typeof groups[number])=>[...group.items].sort((a,b)=>a.transform[4]-b.transform[4]).map(item=>item.str).join(' ');
+ const consumed=new Set<typeof groups[number]>();
+ for(const group of groups){
+  // A vertically centered roll cell may sit on a separate baseline from its row.
+  const text=groupText(group).trim(),roll=text.match(rollPattern);
+  if(!roll||roll[0]!==text)continue;
+  const height=Math.max(...group.items.map(item=>item.height));
+  const candidates=groups.filter(other=>other!==group&&!consumed.has(other)&&Math.abs(other.y-group.y)<=height&&
+   !rollPattern.test(groupText(other))&&/^\d+\s+[A-F]\s+\D.*\s+\d+(?:\.\d+)?\s*$/i.test(groupText(other)));
+  // Never attach a roll to an ambiguous neighboring row.
+  if(candidates.length!==1)continue;
+  const target=candidates[0],x=Math.min(...group.items.map(item=>item.transform[4]));
+  const ordered=[...target.items].sort((a,b)=>a.transform[4]-b.transform[4]);
+  if(ordered.length<3||x<=ordered[1].transform[4]||x>=ordered[2].transform[4])continue;
+  target.items.push(...group.items);consumed.add(group);
+ }
+ return groups.filter(group=>!consumed.has(group)).sort((a,b)=>b.y-a.y).map(group=>{
+  let text='';const spans:NonNullable<TextLine['spans']>=[];
+  for(const item of group.items.sort((a,b)=>a.transform[4]-b.transform[4])){if(text)text+=' ';const start=text.length;text+=item.str;spans.push({start,end:text.length,x:item.transform[4],width:item.width});}
+  return {text,page,spans};
+ });
+}
 export async function extractPdf(file:File){
  const pdfjs=await import('pdfjs-dist');pdfjs.GlobalWorkerOptions.workerSrc=new URL('pdf.worker.min.mjs',document.baseURI).href;
  const task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),useSystemFonts:true});
  const doc=await task.promise;
  const lines:TextLine[]=[];
- try{for(let p=1;p<=doc.numPages;p++){const content=await (await doc.getPage(p)).getTextContent();const items=content.items.filter((x:any)=>'str'in x&&x.str.trim()) as any[];const groups:{y:number;items:any[]}[]=[];for(const item of items){const y=item.transform[5];let group=groups.find(g=>Math.abs(g.y-y)<3);if(!group){group={y,items:[]};groups.push(group);}group.items.push(item);}for(const group of groups.sort((a,b)=>b.y-a.y)){let text='';const spans:NonNullable<TextLine['spans']>=[];for(const item of group.items.sort((a,b)=>a.transform[4]-b.transform[4])){if(text)text+=' ';const start=text.length;text+=item.str;spans.push({start,end:text.length,x:item.transform[4],width:item.width});}lines.push({text,page:p,spans});}}}
+ try{for(let p=1;p<=doc.numPages;p++){const content=await (await doc.getPage(p)).getTextContent();const items=content.items.filter((x:any)=>'str'in x) as PdfTextItem[];lines.push(...pdfTextLines(items,p));}}
  finally{await task.destroy();}
  const parsed=parseLines(lines);const full=lines.map(l=>l.text).join('\n');const course=full.match(/Course\s*:?\s*(.+)/i)?.[1]?.trim();
  const columns=parsed.count===4&&/SUPPLY CHAIN ANALYTICS/i.test(full)?['Mid-Term (20)','Assignments / Quizzes / CP (20)','Project (30)','End-Term (30)']:Array.from({length:parsed.count},(_,i)=>`Component ${i+1}`);

@@ -35,11 +35,6 @@ export function calculate(rows:MarkRow[]){
   return {...r,rank,z,percentile,grade,point:gradePoint(grade),error:sd===0?'#DIV/0!':null,average:avg,cohort:n};
  });
 }
-// Excel XLOOKUP(..., name column, result column, "N/A", 0): case-insensitive,
-// exact name comparison, first match in the unchanged source row order.
-export function lookupResult(rows:ReturnType<typeof calculate>,name:string){
- return rows.find(r=>r.name.toLowerCase()===name.toLowerCase());
-}
 export function weightedGpa(entries:{credit:number;point:number|null|undefined}[]){
  const credit=entries.reduce((s,e)=>s+e.credit,0);
  if(!credit||entries.some(e=>e.credit>0&&e.point==null))return null;
@@ -50,10 +45,17 @@ export const term4Subjects=[{name:'ESGMR',credit:1},{name:'ECT',credit:1},{name:
 export function applyReportCredits(subjects:Subject[]):Subject[]{
  return subjects.map(s=>s.name.trim().toLowerCase()==='esgmr'?{...s,term:4,credit:1}:s);
 }
-const nameKey=(name:string)=>name.trim().replace(/\s+/g,' ').toLowerCase();
-export function studentReport(subjects:Subject[],name:string){
+export function studentId(roll:string){
+ const compact=roll.replace(/[\s/]/g,'').toUpperCase();
+ const match=compact.match(/^(PGP|ABM)?(\d{2})(\d+)(R?)$/);
+ if(!match)return '';
+ return (match[1]??'PGP')+'/'+match[2]+'/'+match[3].padStart(3,'0')+match[4];
+}
+export function studentReport(subjects:Subject[],roll:string){
+ const id=studentId(roll);
+ if(!id)return [];
  return applyReportCredits(subjects).flatMap(s=>{
-  const rows=calculate(s.rows),result=rows.find(r=>nameKey(r.name)===nameKey(name));
+  const rows=calculate(s.rows),result=rows.find(r=>studentId(r.roll)===id);
   if(!result)return [];
   // When population variance is zero, use the exclusive percentile of printed
   // totals directly so the report can still assign a grade without a Z-score.
@@ -79,7 +81,7 @@ export function validateSubject(s:Subject){
   if(!Array.isArray(r.components)||r.components.length!==s.columns.length)throw Error(`${rowLabel}: expected ${s.columns.length} mark components; found ${Array.isArray(r.components)?r.components.length:0}. Upload the PDF again to align its columns.`);
   const bad=r.components.findIndex(v=>v!==null&&(!Number.isFinite(v)||v<0));
   if(bad>=0)throw Error(`${rowLabel}: component ${bad+1} must be a non-negative number or blank.`);
-  const key=rollKey(r.roll);
+  const key=studentId(r.roll);
   if(seen.has(key)&&!(s.source==='Marks Databse.xlsx'&&JSON.stringify(seen.get(key))===JSON.stringify(r)))throw Error('Duplicate student roll number: '+r.roll);
   seen.set(key,r);
  }

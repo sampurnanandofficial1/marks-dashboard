@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import {studentReport,weightedGpa,validateSubject,applyReportCredits} from '../lib/grades.ts';
+import {studentReport,weightedGpa,validateSubject,applyReportCredits,studentId} from '../lib/grades.ts';
 const row=(name,total,i)=>({name,total,roll:'PGP/41/'+i,components:[],section:''});
 const subject=(id,term,credit,rows,name=id)=>({id,name,term,credit,rows,columns:[],source:'test.pdf',updatedAt:null});
 const subjects=[subject('ESGMR',5,0,[row('Student One',40,1),row('Other',20,2)]),subject('New elective',7,2,[row(' STUDENT   ONE ',10,1),row('Other',20,2)]),subject('Absent subject',4,10,[row('Other',10,2)]),subject('Pending',8,1,[]),subject('Non-credit',4,0,[row('Student One',10,1)]),subject('New elective 2',7,1,[row('Student One',40,1),row('Other',10,2)])];
-const report=studentReport(subjects,'Student One');assert.equal(report.length,4);
+const report=studentReport(subjects,'PGP41001');assert.equal(report.length,4);
 assert.equal(report.find(s=>s.name==='ESGMR').term,4);assert.equal(report.find(s=>s.name==='ESGMR').credit,1);
 assert(report.every(s=>s.result.grade&&Number.isFinite(s.result.point)));
 assert.equal(report.find(s=>s.name==='Non-credit').result.percentile,.5);
@@ -19,4 +19,16 @@ validateSubject(subject('New empty subject',20,25,[]));
 validateSubject(subject('One student',7,25,[row('Student One',2000,1)]));
 validateSubject({...subject('Large subject',20,25,Array.from({length:2001},(_,i)=>({...row('Test '+i,2000,i),components:Array(31).fill(2000)}))),columns:Array(31).fill('Mark')});
 assert.throws(()=>validateSubject(subject('Invalid',0,-1,[])),/non-negative/);
-console.log('Passed: all matching subjects, name spacing, zero-credit grades, ESGMR migration, weighted term and cumulative GPA, pending exclusions, single-student grades and removed subject/term/credit/row/component limits.');
+console.log('Passed: all matching subjects, roll/PGP-ID matching, zero-credit grades, ESGMR migration, weighted term and cumulative GPA, pending exclusions, single-student grades and removed subject/term/credit/row/component limits.');
+
+const identitySubjects=[subject('Changed name',4,1,[row('Different Name',40,1)]),subject('Same name different ID',4,1,[row('Student One',40,2)]),subject('Different programme',4,1,[{...row('Student One',40,1),roll:'ABM/41/001'}]),subject('Returning ID',4,1,[{...row('Student One',40,1),roll:'PGP/41/001R'}])];
+assert.deepEqual(studentReport(identitySubjects,'PGP41001').map(s=>s.name),['Changed name']);
+assert.deepEqual(studentReport(identitySubjects,'41001').map(s=>s.name),['Changed name']);
+assert.deepEqual(studentReport(identitySubjects,'ABM41001').map(s=>s.name),['Different programme']);
+assert.deepEqual(studentReport(identitySubjects,'PGP41001R').map(s=>s.name),['Returning ID']);
+assert.deepEqual(studentReport(identitySubjects,'Student One'),[]);
+assert.deepEqual(studentReport(identitySubjects,''),[]);
+assert.equal(studentId(' pgp / 41 / 221 '),studentId('PGP41221'));
+console.log('Identity checks passed: name changes, shared names, ID formats, programme separation and returning-student suffixes.');
+
+assert.equal(studentId('PGP/41/1R'),studentId('PGP41001R'));

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {calculate,percentRankExc,gradeFromPercentile,gradePoint,lookupResult,weightedGpa,applyReportCredits,validateSubject} from '../lib/grades.ts';
+import {calculate,percentRankExc,gradeFromPercentile,gradePoint,weightedGpa,applyReportCredits,validateSubject} from '../lib/grades.ts';
 import {parseLines} from '../lib/pdf.ts';
 const row=(total,i)=>({total,roll:'PGP/41/'+i,name:'Student '+i,section:'A',components:[]});
 const tied=calculate([1,2,2,3].map(row));
@@ -17,8 +17,6 @@ for(const [threshold,grade,point] of [[.95,'A+',10],[.85,'A',9],[.75,'A-',8],[.5
 }
 assert.equal(gradePoint('UNKNOWN'),0);
 assert(calculate([2,2].map(row)).every(r=>r.error==='#DIV/0!'&&r.z===null&&r.percentile===null));
-assert.equal(lookupResult([{name:'Sampurn Anand',point:5},{name:'SAMPURN ANAND',point:9}],'SAMPURN ANAND').point,5);
-assert.equal(lookupResult([{name:'Sampurn Anand',point:5}],'Sampurn  Anand'),undefined);
 assert.equal(weightedGpa([{credit:1,point:7},{credit:.5,point:4}]),6);
 assert.equal(weightedGpa([{credit:1,point:7},{credit:1,point:null}]),null);
 assert.equal(weightedGpa([{credit:1,point:7},{credit:0,point:null}]),7);
@@ -31,4 +29,4 @@ const moved=applyReportCredits([{name:'ESGMR',term:5,credit:0}]);assert.equal(mo
 const parsed=parseLines([{page:1,text:'1 ABM/22/010 TEST NAME 20 30 50'},{page:1,text:'2 PGP/40/138R RETURNING STUDENT 15 20 35'},{page:1,text:'3 PGP41221 SAMPURN ANAND 10 20 30'}]);
 assert.equal(parsed.rows.length,3);assert.deepEqual(parsed.issues,[]);
 assert.equal(parsed.rows[1].roll,'PGP/40/138R');assert.equal(parsed.rows[2].roll,'PGP/41/221');
-console.log('Formula checks passed: Excel ranks, population Z-scores, exclusive percentiles, all grade boundaries, SWITCH fallback, exact-name first-match lookup, SGPA/CGPA credits, missing grades, PGP/ABM PDF extraction.');
+console.log('Formula checks passed: Excel ranks, population Z-scores, exclusive percentiles, all grade boundaries, SWITCH fallback, SGPA/CGPA credits, missing grades, PGP/ABM PDF extraction.');

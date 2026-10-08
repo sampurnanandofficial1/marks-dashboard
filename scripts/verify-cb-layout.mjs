@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {parsePdfLines} from '../lib/pdf.ts';
+const line=(page,cells)=>{let text='';const spans=[];for(const [str,x,width=10] of cells){if(text)text+=' ';const start=text.length;text+=str;spans.push({start,end:text.length,x,width});}return {text,page,spans};};
+const metadata=page=>['SECTION :','Course :','Professor'].map(label=>line(page,[[label,80],['TABLE METADATA',151,70]]));
+const header=page=>line(page,[['S.No.',53],['ROLL NO.',80,39],['Name',151,25],['Quiz',299],['Total',526,21]]);
+const row=(page,serial,id,total='75.5')=>line(page,[[serial,63],[id,80,50],['TEST STUDENT',151,70],['12',299],['17',346],[total,528,18]]);
+const parsed=parsePdfLines([...metadata(1),header(1),row(1,'1','ABM/22/015'),row(2,'2','NUMERIC-001'),...metadata(3),header(3),row(3,'1','PhD-27035')]);
+assert.deepEqual(parsed.issues,[]);assert.equal(parsed.rows.length,3);assert(parsed.rows.every(r=>r.total===75.5&&r.components.length===2));
+const missing=parsePdfLines([...metadata(1),header(1),row(1,'1','ABM/22/015','-')]);assert(missing.issues.length>0);assert.equal(missing.rows.length,0);
+const numeric=row(1,'1','123456');const arbitrary=parsePdfLines([...metadata(1),header(1),numeric]);assert.deepEqual(arbitrary.issues,[]);assert.equal(arbitrary.rows.length,1);
+console.log('Passed: section metadata excluded on each page, continuation pages and arbitrary student IDs retained, missing student totals still flagged.');

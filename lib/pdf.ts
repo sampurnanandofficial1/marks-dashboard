@@ -2,6 +2,11 @@ import {normalizeRoll,type MarkRow} from './grades.ts';
 export type TextLine={text:string;page:number;spans?:{start:number;end:number;x:number;width:number}[]};
 export function parseLines(lines:TextLine[]){
  const identityColumns=new Map<number,{roll:number;name:number}>();
+ const identityHeaderIndex=new Map<number,number>();
+ for(const [index,line] of lines.entries()){
+  const labels=(line.spans??[]).map(span=>line.text.slice(span.start,span.end).trim());
+  if(!identityHeaderIndex.has(line.page)&&labels.some(label=>/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(label))&&labels.some(label=>/student\s*name|^name$/i.test(label)))identityHeaderIndex.set(line.page,index);
+ }
  for(const page of new Set(lines.map(line=>line.page))){let roll:number|undefined,name:number|undefined;for(const line of lines.filter(line=>line.page===page))for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end);if(/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(label))roll=span.x+span.width/2;if(/student\s*name|^name$/i.test(label.trim()))name=span.x+span.width/2;}if(roll!==undefined&&name!==undefined)identityColumns.set(page,{roll,name});}
  let identityColumn:{roll:number;name:number}|undefined;
  const totalColumns=new Map<number,{x:number;tolerance:number}>();
@@ -10,14 +15,14 @@ export function parseLines(lines:TextLine[]){
 
  const rows:MarkRow[]=[],issues:string[]=[],warnings:string[]=[];const seen=new Set<string>();let counts:number[]=[];
  const positions:(number[]|null)[]=[];
- for(const line of lines){
+ for(const [lineIndex,line] of lines.entries()){
   let {text,page,spans}=line;
   // Multi-line table headings can overlap the roll/name geometry. They are not students.
   if(spans?.some(span=>/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(text.slice(span.start,span.end)))&&spans.some(span=>/student\s*name|^name$/i.test(text.slice(span.start,span.end).trim())))continue;
   totalColumn=totalColumns.get(page)??totalColumn;
   identityColumn=identityColumns.get(page)??identityColumn;
 
-  const tableRow=!!(identityColumn&&totalColumn&&spans&&spans.some(span=>span.x>=(identityColumn!.roll+identityColumn!.name)/2&&span.x<totalColumn!.x&&/\p{L}/u.test(text.slice(span.start,span.end)))&&(/^\s*\d+\s+/.test(text)||spans.some(span=>span.x>=identityColumn!.roll-(identityColumn!.name-identityColumn!.roll)/2&&span.x<(identityColumn!.roll+identityColumn!.name)/2&&!/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(text.slice(span.start,span.end)))));
+  const tableRow=!!((identityHeaderIndex.get(page)===undefined||lineIndex>=identityHeaderIndex.get(page)!)&&identityColumn&&totalColumn&&spans&&spans.some(span=>span.x>=(identityColumn!.roll+identityColumn!.name)/2&&span.x<totalColumn!.x&&/\p{L}/u.test(text.slice(span.start,span.end)))&&(/^\s*\d+\s+/.test(text)||spans.some(span=>span.x>=identityColumn!.roll-(identityColumn!.name-identityColumn!.roll)/2&&span.x<(identityColumn!.roll+identityColumn!.name)/2&&!/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(text.slice(span.start,span.end)))));
   const knownId=/(?:PGP|ABM|IEP|PHD)\s*[\/ -]?\s*\d{2}\s*[\/ -]?\s*\d{3,}R?/i;
   const genericRow=(/^\s*\d+\s+/.test(text)||/^\s*\S*\d\S*\s+/.test(text))&&/\p{L}.*\s+(?:\d+(?:\.\d+)?|AB|ABS|NA|--|-)\s*$/iu.test(text);
   if(!tableRow&&!knownId.test(text)&&!genericRow)continue;

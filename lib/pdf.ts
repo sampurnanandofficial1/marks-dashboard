@@ -5,13 +5,15 @@ export function parseLines(lines:TextLine[]){
  for(const page of new Set(lines.map(line=>line.page))){let roll:number|undefined,name:number|undefined;for(const line of lines.filter(line=>line.page===page))for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end);if(/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(label))roll=span.x+span.width/2;if(/student\s*name|^name$/i.test(label.trim()))name=span.x+span.width/2;}if(roll!==undefined&&name!==undefined)identityColumns.set(page,{roll,name});}
  let identityColumn:{roll:number;name:number}|undefined;
  const totalColumns=new Map<number,{x:number;tolerance:number}>();
- for(const line of lines){for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end),match=label.match(/\bTotal(?:\s+(?:Marks|Score))?\b/i);if(!match)continue;const center=match.index!+match[0].length/2;totalColumns.set(line.page,{x:span.x+span.width*center/Math.max(1,label.length),tolerance:Math.max(15,span.width/2+5)});}}
+ for(const line of lines){for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end),match=label.match(/\bTotal(?:\s+(?:Marks|Score))?\b/i);if(!match)continue;const center=/^\s*Total(?:\s+(?:Marks|Score))?(?:\s*[([][^\n]*)?\s*$/i.test(label)?label.length/2:match.index!+match[0].length/2;totalColumns.set(line.page,{x:span.x+span.width*center/Math.max(1,label.length),tolerance:Math.max(15,span.width/2+5)});}}
  let totalColumn:{x:number;tolerance:number}|undefined;
 
  const rows:MarkRow[]=[],issues:string[]=[],warnings:string[]=[];const seen=new Set<string>();let counts:number[]=[];
  const positions:(number[]|null)[]=[];
  for(const line of lines){
   let {text,page,spans}=line;
+  // Multi-line table headings can overlap the roll/name geometry. They are not students.
+  if(spans?.some(span=>/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(text.slice(span.start,span.end)))&&spans.some(span=>/student\s*name|^name$/i.test(text.slice(span.start,span.end).trim())))continue;
   totalColumn=totalColumns.get(page)??totalColumn;
   identityColumn=identityColumns.get(page)??identityColumn;
 

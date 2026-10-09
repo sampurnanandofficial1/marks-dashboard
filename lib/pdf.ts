@@ -9,11 +9,24 @@ export function parseLines(lines:TextLine[]){
  }
  for(const page of new Set(lines.map(line=>line.page))){let roll:number|undefined,name:number|undefined;for(const line of lines.filter(line=>line.page===page))for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end);if(/roll\s*(?:no|number)|student\s*id|pgp\s*id/i.test(label))roll=span.x+span.width/2;if(/student\s*name|^name$/i.test(label.trim()))name=span.x+span.width/2;}if(roll!==undefined&&name!==undefined)identityColumns.set(page,{roll,name});}
  let identityColumn:{roll:number;name:number}|undefined;
- const totalColumns=new Map<number,{x:number;tolerance:number}>();
- for(const line of lines){for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end),match=label.match(/\bTotal(?:\s+(?:Marks|Score))?(?=\b|\d)/i);if(!match)continue;const center=/^\s*Total(?:\s+(?:Marks|Score))?(?:\s*(?:[([][^\n]*|\d+(?:\.\d+)?%?))?\s*$/i.test(label)?label.length/2:match.index!+match[0].length/2;totalColumns.set(line.page,{x:span.x+span.width*center/Math.max(1,label.length),tolerance:Math.max(15,span.width/2+5)});}}
- let totalColumn:{x:number;tolerance:number}|undefined;
+ const totalColumns=new Map<number,{x:number;tolerance:number;minX:number;maxX:number;markX?:number}>();
+ for(const line of lines){for(const span of line.spans??[]){const label=line.text.slice(span.start,span.end),match=label.match(/\bTotal(?:\s+(?:Marks|Score))?(?=\b|\d)/i);if(!match)continue;const center=/^\s*Total(?:\s+(?:Marks|Score))?(?:\s*(?:[([][^\n]*|\d+(?:\.\d+)?%?))?\s*$/i.test(label)?label.length/2:match.index!+match[0].length/2;totalColumns.set(line.page,{x:span.x+span.width*center/Math.max(1,label.length),tolerance:Math.max(15,span.width/2+5),minX:span.x,maxX:Math.min(...(line.spans??[]).filter(s=>s.x>span.x).map(s=>s.x),Infinity)});}}
+ // Printed totals may be right-aligned far beyond left-aligned heading text.
+ // Locate their numeric column across student rows, staying before the next heading.
+ for(const [page,column] of totalColumns){
+  const buckets=new Map<number,number[]>();
+  for(const line of lines.filter(l=>l.page===page)){
+   if(!/(?:PGP|ABM|IEP|PHD)\s*[\/ -]?\s*\d{2}\s*[\/ -]?\s*\d{3,}/i.test(line.text))continue;
+   const candidates=(line.spans??[]).filter(span=>/^\d+(?:\.\d+)?$/.test(line.text.slice(span.start,span.end).trim())).map(span=>span.x+span.width/2).filter(x=>x>=column.minX&&x<column.maxX).sort((a,b)=>a-b);
+   if(!candidates.length)continue;
+   const x=candidates[0],key=Math.round(x/12);buckets.set(key,[...(buckets.get(key)??[]),x]);
+  }
+  const winner=[...buckets.values()].sort((a,b)=>b.length-a.length||Math.abs(a[0]-column.x)-Math.abs(b[0]-column.x))[0];
+  if(winner){winner.sort((a,b)=>a-b);column.markX=winner[Math.floor(winner.length/2)];}
+ }
+ let totalColumn:{x:number;tolerance:number;minX:number;maxX:number;markX?:number}|undefined;
 
- const rows:MarkRow[]=[],issues:string[]=[],warnings:string[]=[];const seen=new Set<string>();let counts:number[]=[];
+ const rows:MarkRow[]=[],issues:string[]=[],warnings:string[]=[];const seen=new Map<string,string>();let counts:number[]=[];
  const positions:(number[]|null)[]=[];
  for(const [lineIndex,line] of lines.entries()){
   let {text,page,spans}=line;
@@ -30,7 +43,7 @@ export function parseLines(lines:TextLine[]){
    const candidates=[...text.matchAll(/\S+/g)].filter(token=>/^(?:\d+(?:\.\d+)?|AB|ABS|NA|--|-)$/i.test(token[0])).map(token=>{
     const center=token.index!+token[0].length/2,span=spans.find(s=>center>=s.start&&center<=s.end);
     return {token,x:span?span.x+span.width*(center-span.start)/Math.max(1,span.end-span.start):NaN};
-   }).filter(candidate=>Number.isFinite(candidate.x)&&Math.abs(candidate.x-totalColumn!.x)<=totalColumn!.tolerance).sort((a,b)=>Math.abs(a.x-totalColumn!.x)-Math.abs(b.x-totalColumn!.x));
+   }).filter(candidate=>Number.isFinite(candidate.x)&&candidate.x<totalColumn!.maxX&&(Math.abs(candidate.x-(totalColumn!.markX??totalColumn!.x))<=(totalColumn!.markX===undefined?totalColumn!.tolerance:15))).sort((a,b)=>Math.abs(a.x-(totalColumn!.markX??totalColumn!.x))-Math.abs(b.x-(totalColumn!.markX??totalColumn!.x)));
    if(!candidates.length){issues.push(`Page ${page}: could not identify the marks in the Total column.`);continue;}
    const token=candidates[0].token;text=text.slice(0,token.index!+token[0].length);
   }
@@ -57,7 +70,7 @@ export function parseLines(lines:TextLine[]){
   const vals=tail[1].trim().split(/\s+/).map(x=>/^\d/.test(x)?Number(x):null),total=vals.at(-1);
   const name=m[3].slice(0,m[3].length-tail[0].length).trim(),roll=normalizeRoll(m[2]);
   if(total===null||total===undefined||!name||!/\p{L}/u.test(name)){issues.push(`Page ${page}: total marks missing for ${roll}.`);continue;}
-  if(seen.has(roll)){issues.push(`Duplicate roll number ${roll}.`);continue;}seen.add(roll);
+  if(seen.has(roll))issues.push(`Duplicate roll number ${roll}: ${seen.get(roll)} and ${name}. Correct the source identifiers before saving.`);else seen.set(roll,name);
   const comps=vals.slice(0,-1);counts.push(comps.length);
   const offset=m.index!+m[0].length-tail[1].length;
   const centers=[...tail[1].matchAll(/\S+/g)].slice(0,-1).map(token=>{

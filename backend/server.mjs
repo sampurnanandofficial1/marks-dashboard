@@ -14,7 +14,7 @@ const expected=createHash('sha256').update(password).digest();
 const allowed=new Set(['https://sampurnanandofficial1.github.io',...(process.env.EXTRA_ORIGINS??'').split(',').filter(Boolean)]);
 createServer(async(req,res)=>{
  const origin=req.headers.origin;
- if(origin&&allowed.has(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Authorization,Content-Type');res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');}
+ if(origin&&allowed.has(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Authorization,Content-Type');res.setHeader('Access-Control-Allow-Methods','GET,POST,DELETE,OPTIONS');}
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
  const send=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
  if(req.url==='/health')return send(200,{status:'ok'});
@@ -22,6 +22,17 @@ createServer(async(req,res)=>{
  if(req.method==='OPTIONS'){res.writeHead(204);return res.end();}
  const token=(req.headers.authorization??'').replace(/^Bearer /,'');
  if(!timingSafeEqual(createHash('sha256').update(token).digest(),expected))return send(401,{error:'Enter the correct access code to open your marks.'});
+ if(req.method==='DELETE'&&/^\/api\/subjects\/[^/]+$/.test(req.url??'')){
+  try{
+   const id=decodeURIComponent(req.url.slice('/api/subjects/'.length));
+   if(seed.subjects.some(s=>s.id===id))return send(400,{error:'Workbook subjects cannot be deleted.'});
+   const record=db.prepare('SELECT pdf_key FROM subjects WHERE id=?').get(id);
+   if(!record)return send(404,{error:'Subject not found.'});
+   db.prepare('DELETE FROM subjects WHERE id=?').run(id);
+   if(record.pdf_key)await fs.unlink(root+'/'+record.pdf_key).catch(console.error);
+   return send(200,{deletedId:id});
+  }catch(e){console.error(e);return send(400,{error:'Could not delete this subject.'});}
+ }
  if(req.method==='GET'&&/^\/api\/subjects\/[^/]+\/pdf$/.test(req.url??'')){
   try{const id=decodeURIComponent(req.url.slice('/api/subjects/'.length,-'/pdf'.length)),record=db.prepare('SELECT pdf_key FROM subjects WHERE id=?').get(id);
    if(!record?.pdf_key)return send(404,{error:'No uploaded PDF for this subject.'});

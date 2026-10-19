@@ -57,7 +57,7 @@ type Actual={term:number;subject:string;credit:number;grade:string;point:number}
 export default function Dashboard(){
  const [subjects,setSubjects]=useState<Subject[]>([]),[actual,setActual]=useState<Actual[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [code,setCode]=useState(""),[locked,setLocked]=useState(false);
- const [student,setStudent]=useState(''),[term,setTerm]=useState('all'),[tab,setTab]=useState('report'),[subjectId,setSubjectId]=useState('SCAS'),[search,setSearch]=useState(''),[basis,setBasis]=useState('estimated');
+ const [student,setStudent]=useState(''),[term,setTerm]=useState('all'),[tab,setTab]=useState('report'),[subjectId,setSubjectId]=useState('SCAS'),[search,setSearch]=useState(''),[basis,setBasis]=useState('recorded');
  const [open,setOpen]=useState(false),[editing,setEditing]=useState<Subject|null>(null),[name,setName]=useState(''),[credit,setCredit]=useState('1'),[courseTerm,setCourseTerm]=useState('4'),[file,setFile]=useState<File|null>(null),[parsed,setParsed]=useState<Awaited<ReturnType<typeof extractPdf>>|null>(null),[busy,setBusy]=useState(false),[uploadError,setUploadError]=useState('');
  const [sheetSort,setSheetSort]=useState<SheetSort|null>(null);
  const generation=useRef(0);

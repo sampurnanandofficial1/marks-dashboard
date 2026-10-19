@@ -55,7 +55,7 @@ export function weightedGpa(entries:{credit:number;point:number|null|undefined}[
  const weighted=entries.reduce((s,e)=>s+e.credit*(e.point??0),0);
  return weighted/(credit*10)*10;
 }
-export const term4Subjects=[{name:'ESGMR',credit:1},{name:'ECT',credit:1},{name:'HFS',credit:1},{name:'Strat All',credit:1},{name:'SM-2',credit:0},{name:'SCAS',credit:1},{name:'TIDPBM',credit:1}];
+export const term4Subjects=[{name:'ESGMR',credit:1},{name:'ECT',credit:1},{name:'HFS',credit:1},{name:'Strat All',credit:1},{name:'SM-2',credit:0.5},{name:'SCAS',credit:1},{name:'TIDPBM',credit:1}];
 export function applyReportCredits(subjects:Subject[]):Subject[]{
  return subjects.map(s=>s.name.trim().toLowerCase()==='esgmr'?{...s,term:4,credit:1}:s);
 }

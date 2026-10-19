@@ -56,3 +56,5 @@ createServer(async(req,res)=>{
 }).listen(Number(process.env.PORT??3000),'0.0.0.0',()=>console.log('Marks API is ready'));
 
 // Rebuild marker: refresh bundled seed data for Term 4 recorded grades.
+
+// Rebuild marker for Term 4 recorded-grade deployment verification.

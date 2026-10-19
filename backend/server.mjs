@@ -54,3 +54,5 @@ createServer(async(req,res)=>{
   return send(200,{subject});
  }catch(e){console.error(e);return send(400,{error:e instanceof Error?e.message:'Could not save this subject.'});}
 }).listen(Number(process.env.PORT??3000),'0.0.0.0',()=>console.log('Marks API is ready'));
+
+// Rebuild marker: refresh bundled seed data for Term 4 recorded grades.
